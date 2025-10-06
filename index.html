@@ -245,25 +245,27 @@ function openDay(i){
     c.appendChild(sec);
   }
 
-  // Прибирання
-  const cl=document.createElement("section");
-  cl.innerHTML="<h3>ПРИБИРАННЯ</h3>";
-  const clKey="ПРИБИРАННЯ_"+dayCleaning;
-  if(data[i].tasks[clKey]===undefined)data[i].tasks[clKey]=false;
-  const lbl=document.createElement("label");
-  const chk=document.createElement("input");
-  chk.type="checkbox";
-  chk.checked=data[i].tasks[clKey];
-  chk.onchange = () => {
-  data[i].tasks[key] = chk.checked;
+  // === Прибирання ===
+const clSection = document.createElement("section");
+clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
+
+const clKey = "ПРИБИРАННЯ_" + dayCleaning;
+if (data[i].tasks[clKey] === undefined) data[i].tasks[clKey] = false;
+
+const clLabel = document.createElement("label");
+const clCheckbox = document.createElement("input");
+clCheckbox.type = "checkbox";
+clCheckbox.checked = data[i].tasks[clKey];
+clCheckbox.onchange = () => {
+  data[i].tasks[clKey] = clCheckbox.checked;
   saveData();
   updateProgress();
 };
 
-  lbl.appendChild(chk);
-  lbl.appendChild(document.createTextNode(" "+dayCleaning));
-  cl.appendChild(lbl);
-  c.appendChild(cl);
+clLabel.appendChild(clCheckbox);
+clLabel.appendChild(document.createTextNode(" " + dayCleaning));
+clSection.appendChild(clLabel);
+c.appendChild(clSection);
 
   // Щоденник
   const diary=document.createElement("section");
