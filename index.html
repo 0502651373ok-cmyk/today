@@ -113,6 +113,11 @@ button.export {
   cursor: pointer;
   margin-top: 10px;
 }
+.day-btn.active-day {
+  background: #aed581 !important;
+  border: 2px solid #558b2f;
+  transform: scale(1.05);
+}
 </style>
 </head>
 <body>
@@ -198,7 +203,14 @@ function openDay(i){
   const weekday = d.getDay()===0?6:d.getDay()-1;
   const weekDays=["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
   const dayName=weekDays[weekday];
-  c.innerHTML=`<h2>${dayName} — День ${i+1}</h2>`;
+  // Форматований заголовок: день тижня, дата, номер дня
+const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
+c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
+
+// Підсвічуємо активну кнопку дня
+document.querySelectorAll(".day-btn").forEach(btn => btn.classList.remove("active-day"));
+const allBtns = document.querySelectorAll(".day-btn");
+if (allBtns[i]) allBtns[i].classList.add("active-day");
 
   const cleaningSchedule=["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
   const dayCleaning=cleaningSchedule[weekday];
