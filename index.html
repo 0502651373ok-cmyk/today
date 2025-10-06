@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>☀️ Today Is The Day — Щоденник прогресу</title>
+<link rel="icon" type="image/svg+xml"
+href="data:image/svg+xml,
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
+<circle cx='50' cy='50' r='20' fill='yellow' stroke='green' stroke-width='5'/>
+<g stroke='green' stroke-width='5'>
+<line x1='50' y1='5' x2='50' y2='20'/>
+<line x1='50' y1='80' x2='50' y2='95'/>
+<line x1='5' y1='50' x2='20' y2='50'/>
+<line x1='80' y1='50' x2='95' y2='50'/>
+</g></svg>">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f7fbe7;
+  color: #333;
+  margin: 0;
+  text-align: center;
+}
+header {
+  background: linear-gradient(90deg, #ffee58, #aee571);
+  padding: 15px;
+  font-size: 1.6em;
+  font-weight: bold;
+  color: #33691e;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+#calendar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px;
+}
+.day-btn {
+  width: 90px;
+  height: 90px;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+  white-space: pre-line;
+}
+.day-btn:hover { background: #dcedc8; }
+.day-btn.done { background: #c5e1a5; }
+#content {
+  max-width: 700px;
+  margin: 20px auto;
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  text-align: left;
+}
+h2 { color: #558b2f; text-align: center; }
+section { margin-bottom: 15px; }
+label { display: block; margin: 4px 0; }
+button.back {
+  margin-top: 15px;
+  background: #8bc34a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 15px;
+  cursor: pointer;
+}
+#progressBar {
+  width: 80%;
+  height: 20px;
+  background: #cfd8dc;
+  border-radius: 10px;
+  margin: 15px auto;
+  overflow: hidden;
+}
+#progressFill {
+  height: 100%;
+  width: 0%;
+  background: #9ccc65;
+  transition: width 0.3s;
+}
+.quote {
+  text-align: right;
+  font-style: italic;
+  font-size: 1.1em;
+  color: #33691e;
+  margin: 10px 20px 0 0;
+}
+textarea {
+  width: 100%;
+  height: 150px;
+  margin-top: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  padding: 10px;
+  font-family: inherit;
+  resize: vertical;
+}
+button.export {
+  background: #689f38;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 15px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+</style>
+</head>
+<body>
+<header>☀️ Today Is The Day — Щоденник прогресу</header>
+<div class="quote" id="quote"></div>
+
+<div id="progressBar"><div id="progressFill"></div></div>
+<div id="progressText"></div>
+
+<div id="calendar"></div>
+<div id="content" style="display:none"></div>
+<button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
+<script>
+// === 1. Початкові дані ===
+const DAYS = 30;
+if (!localStorage.getItem("trackerStartDate")) {
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  localStorage.setItem("trackerStartDate", now.toISOString());
+}
+const startDate = new Date(localStorage.getItem("trackerStartDate"));
+const today = new Date();
+today.setHours(0,0,0,0);
+const diffDays = Math.floor((today - startDate) / (1000*60*60*24));
+const todayIndex = Math.min(diffDays, DAYS-1);
+
+let data = JSON.parse(localStorage.getItem("trackerData")) ||
+           Array(DAYS).fill(null).map(()=>({tasks:{}, diary:""}));
+
+function saveData(){
+  localStorage.setItem("trackerData", JSON.stringify(data));
+  updateProgress();
+}
+
+// === 2. Фрази дня ===
+const quotes = [
+"Nie zatrzymuj się – nawet jeśli dziś boli.",
+"Ти не там, де була. І це вже перемога.",
+"Jeszcze nic nie jest skończone.",
+"Не бійся, якщо повільно — бійся стояти.",
+"Żyjesz – to znaczy, możesz jeszcze zacząć.",
+"Навіть маленький рух – це вже шлях.",
+"Kiedyś będziesz wdzięczna, że не здалась dziś.",
+"Ти не втратила — ти змінилась.",
+"Nawet mały krok – to też kierunek.",
+"Все, що потрібно, – це ще один ранок, щоб спробувати."
+];
+document.getElementById("quote").innerText =
+  quotes[Math.floor(Math.random()*quotes.length)];
+
+// === 3. Прогрес-бар ===
+function updateProgress(){
+  let total=0, done=0;
+  data.forEach(day=>{
+    for(const t in day.tasks){ total++; if(day.tasks[t]) done++; }
+  });
+  const percent = total?Math.round(done/total*100):0;
+  document.getElementById("progressFill").style.width = percent+"%";
+  document.getElementById("progressText").innerText = "Виконано: "+percent+"%";
+}
+
+// === 4. Календар ===
+function showCalendar(){
+  const cal=document.getElementById("calendar");
+  cal.innerHTML="";
+  document.getElementById("content").style.display="none";
+  const start=new Date(startDate);
+  for(let i=0;i<DAYS;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const label = `${d.getDate()} ${d.toLocaleString("uk-UA",{month:"short"})}\n(${d.toLocaleString("uk-UA",{weekday:"short"})})`;
+    const btn=document.createElement("button");
+    btn.className="day-btn"+(Object.values(data[i].tasks).every(Boolean)&&Object.keys(data[i].tasks).length?" done":"");
+    btn.innerText=label;
+    btn.onclick=()=>openDay(i);
+    cal.appendChild(btn);
+  }
+}
+
+// === 5. Відкриття дня ===
+function openDay(i){
+  const c=document.getElementById("content");
+  const d=new Date(startDate); d.setDate(startDate.getDate()+i);
+  const weekday = d.getDay()===0?6:d.getDay()-1;
+  const weekDays=["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
+  const dayName=weekDays[weekday];
+  c.innerHTML=`<h2>${dayName} — День ${i+1}</h2>`;
+
+  const cleaningSchedule=["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
+  const dayCleaning=cleaningSchedule[weekday];
+  const workout=i%2===0?"Фітнес 40 хв":"Ходіння з палками 45 хв";
+
+  const cosmetics=[
+    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
+    {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
+    {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
+  ];
+  const dcos=cosmetics[weekday];
+
+  const schedule={
+    РАНОК:["☕ Кава з молоком","Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max",
+           "Зарядка для шиї 20 хв + Ляпко 20 хв",...dcos.morning],
+    ДЕНЬ:[workout,"Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша",...dcos.day],
+    ВЕЧІР:["Magnesium bisglycinate, L-Tryptophan, Розторопша","Розтяжка + дихальні вправи",...dcos.evening]
+  };
+
+  for(const [title,items] of Object.entries(schedule)){
+    const sec=document.createElement("section");
+    sec.innerHTML="<h3>"+title+"</h3>";
+    items.forEach(txt=>{
+      const key=title+"_"+txt;
+      if(data[i].tasks[key]===undefined)data[i].tasks[key]=false;
+      const lbl=document.createElement("label");
+      const chk=document.createElement("input");
+      chk.type="checkbox";
+      chk.checked=data[i].tasks[key];
+      chk.onchange=()=>{data[i].tasks[key]=chk.checked;saveData();showCalendar();};
+      lbl.appendChild(chk);
+      lbl.appendChild(document.createTextNode(" "+txt));
+      sec.appendChild(lbl);
+    });
+    c.appendChild(sec);
+  }
+
+  // Прибирання
+  const cl=document.createElement("section");
+  cl.innerHTML="<h3>ПРИБИРАННЯ</h3>";
+  const clKey="ПРИБИРАННЯ_"+dayCleaning;
+  if(data[i].tasks[clKey]===undefined)data[i].tasks[clKey]=false;
+  const lbl=document.createElement("label");
+  const chk=document.createElement("input");
+  chk.type="checkbox";
+  chk.checked=data[i].tasks[clKey];
+  chk.onchange=()=>{data[i].tasks[clKey]=chk.checked;saveData();showCalendar();};
+  lbl.appendChild(chk);
+  lbl.appendChild(document.createTextNode(" "+dayCleaning));
+  cl.appendChild(lbl);
+  c.appendChild(cl);
+
+  // Щоденник
+  const diary=document.createElement("section");
+  diary.innerHTML="<h3>ЩОДЕННИК</h3>";
+  const ta=document.createElement("textarea");
+  ta.value=data[i].diary||"";
+  ta.placeholder="Запиши, як минув день...";
+  ta.oninput=()=>{data[i].diary=ta.value;saveData();};
+  diary.appendChild(ta);
+  c.appendChild(diary);
+
+  const back=document.createElement("button");
+  back.className="back";
+  back.innerText="← Назад до календаря";
+  back.onclick=showCalendar;
+  c.appendChild(back);
+  c.style.display="block";
+}
+
+// === 6. Експорт у DOCX ===
+document.getElementById("exportBtn").onclick=function(){
+  let text="☀️ Today Is The Day — Щоденник прогресу\n\n";
+  data.forEach((d,i)=>{
+    if(d.diary){
+      const dt=new Date(startDate); dt.setDate(startDate.getDate()+i);
+      text+=`День ${i+1} (${dt.toLocaleDateString("uk-UA")}):\n${d.diary}\n\n`;
+    }
+  });
+  const blob=new Blob([text],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="TodayIsTheDay_Щоденник.docx";
+  a.click();
+};
+
+updateProgress();
+showCalendar();
+openDay(todayIndex);
+</script>
+</body>
+</html>
