@@ -232,7 +232,12 @@ function openDay(i){
       const chk=document.createElement("input");
       chk.type="checkbox";
       chk.checked=data[i].tasks[key];
-      chk.onchange=()=>{data[i].tasks[key]=chk.checked;saveData();};
+      chk.onchange = () => {
+       data[i].tasks[key] = chk.checked;
+       saveData();
+       updateProgress();
+    };
+
       lbl.appendChild(chk);
       lbl.appendChild(document.createTextNode(" "+txt));
       sec.appendChild(lbl);
@@ -249,7 +254,12 @@ function openDay(i){
   const chk=document.createElement("input");
   chk.type="checkbox";
   chk.checked=data[i].tasks[clKey];
-  chk.onchange=()=>{data[i].tasks[clKey]=chk.checked;saveData();showCalendar();};
+  chk.onchange = () => {
+  data[i].tasks[key] = chk.checked;
+  saveData();
+  updateProgress();
+};
+
   lbl.appendChild(chk);
   lbl.appendChild(document.createTextNode(" "+dayCleaning));
   cl.appendChild(lbl);
