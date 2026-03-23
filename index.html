@@ -305,6 +305,26 @@ textarea {
   font-size: 0.93em;
 }
 
+.history-card {
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.history-title {
+  font-weight: bold;
+  color: #33691e;
+  margin-bottom: 6px;
+}
+
+.history-summary {
+  font-size: 0.95em;
+  line-height: 1.55;
+  color: #333;
+}
+
 #polishPanel {
   margin-top: 18px;
   padding-top: 16px;
@@ -792,29 +812,49 @@ const polishSpecialDays = {
   "12-31": ["Sylwester"]
 };
 
-// === 4.1. Локальний fallback для історичних подій ===
-const localHistoricalEvents = {
-  "01-01": [
-    { year: "1801", text: "Powstało Zjednoczone Królestwo Wielkiej Brytanii i Irlandii." }
-  ],
+// === 4.1. Локальний fallback, якщо Вікі не віддасть дані ===
+const localPolishHistoryEvents = {
   "03-08": [
-    { year: "1910", text: "Upowszechniła się idea Międzynarodowego Dnia Kobiet w Europie." },
-    { year: "1917", text: "Demonstracje kobiet w Piotrogrodzie stały się jednym z impulsów wydarzeń rewolucyjnych." }
+    {
+      year: "1968",
+      text: "W Warszawie odbyły się protesty studenckie, które zapoczątkowały wydarzenia Marca ’68 w Polsce.",
+      summary: "Marzec ’68 był kryzysem politycznym i społecznym w PRL. Protesty przeciw cenzurze i ograniczaniu wolności słowa zostały brutalnie stłumione, a władze rozpoczęły kampanię represji oraz propagandy."
+    }
   ],
   "05-03": [
-    { year: "1791", text: "Uchwalono Konstytucję 3 maja." }
+    {
+      year: "1791",
+      text: "Sejm Czteroletni uchwalił Konstytucję 3 maja.",
+      summary: "Konstytucja 3 maja była próbą reformy ustroju Rzeczypospolitej Obojga Narodów. Uznaje się ją za jedną z najważniejszych ustaw w historii Polski i jedną z pierwszych nowoczesnych konstytucji w Europie."
+    }
   ],
   "08-01": [
-    { year: "1944", text: "Rozpoczęło się Powstanie Warszawskie." }
+    {
+      year: "1944",
+      text: "O godzinie 17:00 wybuchło Powstanie Warszawskie.",
+      summary: "Powstanie Warszawskie było zbrojnym wystąpieniem Armii Krajowej przeciw okupacji niemieckiej. Trwało 63 dni i stało się jednym z najważniejszych oraz najbardziej tragicznych wydarzeń w historii Polski podczas II wojny światowej."
+    }
   ],
   "09-01": [
-    { year: "1939", text: "Niemcy zaatakowały Polskę, rozpoczynając II wojnę światową." }
+    {
+      year: "1939",
+      text: "Atakiem Niemiec na Polskę rozpoczęła się II wojna światowa.",
+      summary: "Napaść III Rzeszy na Polskę zapoczątkowała największy konflikt zbrojny XX wieku. Dla Polski oznaczała kampanię wrześniową, okupację oraz ogromne straty ludzkie i materialne."
+    }
   ],
   "11-11": [
-    { year: "1918", text: "Polska odzyskała niepodległość." }
+    {
+      year: "1918",
+      text: "Polska odzyskała niepodległość po 123 latach zaborów.",
+      summary: "11 listopada symbolicznie łączy się z odrodzeniem państwa polskiego po I wojnie światowej. Data ta stała się jednym z najważniejszych punktów polskiej pamięci historycznej i świętem państwowym."
+    }
   ],
-  "12-24": [
-    { year: "1818", text: "Po raz pierwszy wykonano kolędę „Cicha noc”." }
+  "12-13": [
+    {
+      year: "1981",
+      text: "W Polsce wprowadzono stan wojenny.",
+      summary: "Stan wojenny został ogłoszony przez władze PRL w celu zdławienia opozycji, zwłaszcza Solidarności. Wiązał się z internowaniami, ograniczeniem praw obywatelskich oraz silną kontrolą życia publicznego."
+    }
   ]
 };
 
@@ -905,10 +945,118 @@ function formatDayInfoDate(dateObj) {
   }));
 }
 
-function getWikimediaHeaders() {
-  return {
-    "Api-User-Agent": "TodayIsTheDayDiary/1.0 (GitHub Pages)"
-  };
+function getPolishWikiDayTitle(dateObj) {
+  const months = [
+    "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
+    "lipca", "sierpnia", "września", "października", "listopada", "grudnia"
+  ];
+  return `${dateObj.getDate()}_${months[dateObj.getMonth()]}`;
+}
+
+async function fetchWikiParsePage(title) {
+  const url = `https://pl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=text&formatversion=2&format=json&origin=*`;
+  return await fetchJsonWithTimeout(url, 9000);
+}
+
+async function fetchWikiExtract(title) {
+  const url =
+    `https://pl.wikipedia.org/w/api.php?action=query&prop=extracts&titles=${encodeURIComponent(title)}` +
+    `&exintro=1&explaintext=1&redirects=1&formatversion=2&format=json&origin=*`;
+
+  const data = await fetchJsonWithTimeout(url, 9000);
+  const pages = data?.query?.pages || [];
+  const page = pages.find(p => !p.missing);
+  return page?.extract || "";
+}
+
+function cleanText(text) {
+  return String(text || "")
+    .replace(/\[[^\]]*?\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractPolishHistoryEventsFromHtml(html) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = html;
+
+  const headings = [...wrapper.querySelectorAll("h2, h3")];
+
+  let startHeading = null;
+  for (const heading of headings) {
+    const headline = heading.querySelector(".mw-headline");
+    const id = headline?.id || "";
+    const text = cleanText(heading.textContent || "");
+    if (
+      id === "Wydarzenia_w_Polsce" ||
+      text === "Wydarzenia w Polsce" ||
+      text.startsWith("Wydarzenia w Polsce")
+    ) {
+      startHeading = heading;
+      break;
+    }
+  }
+
+  if (!startHeading) return [];
+
+  let node = startHeading.nextElementSibling;
+  const events = [];
+
+  while (node) {
+    if (node.matches("h2")) break;
+    if (node.matches("h3")) break;
+
+    if (node.matches("ul")) {
+      const items = [...node.querySelectorAll(":scope > li")];
+
+      items.forEach(li => {
+        const rawText = cleanText(li.textContent);
+        const match = rawText.match(/^(\d{3,4})\s*[–—-]\s*(.+)$/);
+
+        if (!match) return;
+
+        const year = match[1];
+        const text = match[2];
+
+        const links = [...li.querySelectorAll('a[href^="/wiki/"]')].filter(a => {
+          const href = a.getAttribute("href") || "";
+          return !href.includes(":") && !href.includes("#");
+        });
+
+        const firstGoodLink = links[0] || null;
+        let articleTitle = null;
+
+        if (firstGoodLink) {
+          articleTitle = decodeURIComponent(
+            firstGoodLink.getAttribute("href").replace("/wiki/", "")
+          ).replace(/_/g, " ");
+        }
+
+        events.push({
+          year,
+          text,
+          articleTitle
+        });
+      });
+    }
+
+    node = node.nextElementSibling;
+  }
+
+  return events;
+}
+
+function shortenSummary(text, maxLen = 420) {
+  const cleaned = cleanText(text);
+  if (!cleaned) return "";
+  if (cleaned.length <= maxLen) return cleaned;
+
+  const slice = cleaned.slice(0, maxLen);
+  const lastDot = slice.lastIndexOf(". ");
+  if (lastDot > 120) return slice.slice(0, lastDot + 1).trim();
+
+  const lastSpace = slice.lastIndexOf(" ");
+  return (lastSpace > 120 ? slice.slice(0, lastSpace) : slice).trim() + "…";
 }
 
 // === 6. Побудова розкладу дня ===
@@ -1105,11 +1253,13 @@ async function loadDayInfo(dateObj) {
   `;
 
   let holidays = [];
-  let historyEvents = [];
-  let historySource = "";
+  let historyEventsDetailed = [];
 
   try {
-    const holidayData = await fetchJsonWithTimeout(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`, 7000);
+    const holidayData = await fetchJsonWithTimeout(
+      `https://date.nager.at/api/v3/PublicHolidays/${year}/PL`,
+      7000
+    );
     holidays = Array.isArray(holidayData)
       ? holidayData.filter(h => h.date === `${year}-${month}-${day}`)
       : [];
@@ -1118,41 +1268,38 @@ async function loadDayInfo(dateObj) {
   }
 
   try {
-    const historyData = await fetchJsonWithTimeout(
-      `https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/all/${month}/${day}`,
-      7000,
-      getWikimediaHeaders()
+    const wikiTitle = getPolishWikiDayTitle(dateObj);
+    const parsed = await fetchWikiParsePage(wikiTitle);
+    const html = parsed?.parse?.text || "";
+    const events = extractPolishHistoryEventsFromHtml(html).slice(0, 6);
+
+    const detailed = await Promise.all(
+      events.map(async (ev) => {
+        let summary = "";
+
+        if (ev.articleTitle) {
+          try {
+            summary = await fetchWikiExtract(ev.articleTitle);
+          } catch (e) {
+            console.error("Błąd pobierania opisu hasła wiki:", ev.articleTitle, e);
+          }
+        }
+
+        return {
+          year: ev.year,
+          text: ev.text,
+          summary: shortenSummary(summary, 430)
+        };
+      })
     );
 
-    const selected = Array.isArray(historyData?.selected) ? historyData.selected : [];
-    const events = Array.isArray(historyData?.events) ? historyData.events : [];
-
-    const merged = [...selected, ...events]
-      .filter(ev => ev && typeof ev.year !== "undefined" && typeof ev.text === "string");
-
-    const seen = new Set();
-    historyEvents = merged.filter(ev => {
-      const key = `${ev.year}|${ev.text}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 5).map(ev => ({
-      year: ev.year,
-      text: ev.text
-    }));
-
-    if (historyEvents.length) {
-      historySource = "Źródło: Wikimedia On this day.";
-    }
+    historyEventsDetailed = detailed;
   } catch (e) {
-    console.error("Błąd pobierania wydarzeń historycznych:", e);
+    console.error("Błąd pobierania historii Polski z Wikipedii:", e);
   }
 
-  if (!historyEvents.length) {
-    historyEvents = localHistoricalEvents[md] || [];
-    if (historyEvents.length) {
-      historySource = "Źródło: lokalny zestaw awaryjny.";
-    }
+  if (!historyEventsDetailed.length) {
+    historyEventsDetailed = localPolishHistoryEvents[md] || [];
   }
 
   if (requestId !== currentDayInfoRequestId) return;
@@ -1186,18 +1333,23 @@ async function loadDayInfo(dateObj) {
 
   html += `<div class="day-info-block"><h4>Wydarzenia historyczne</h4>`;
 
-  if (historyEvents.length) {
-    html += "<ul>";
-    historyEvents.forEach(ev => {
-      html += `<li>${escapeHtml(ev.year)}: ${escapeHtml(ev.text)}</li>`;
+  if (historyEventsDetailed.length) {
+    historyEventsDetailed.forEach(ev => {
+      html += `
+        <div class="history-card">
+          <div class="history-title">${escapeHtml(ev.year)}: ${escapeHtml(ev.text)}</div>
+          ${
+            ev.summary
+              ? `<div class="history-summary">${escapeHtml(ev.summary)}</div>`
+              : `<div class="day-info-muted">Brak dodatkowego opisu.</div>`
+          }
+        </div>
+      `;
     });
-    html += "</ul>";
 
-    if (historySource) {
-      html += `<div class="day-info-note">${escapeHtml(historySource)}</div>`;
-    }
+    html += `<div class="day-info-note">Źródło: polska Wikipedia, sekcja „Wydarzenia w Polsce”, oraz opisy powiązanych haseł.</div>`;
   } else {
-    html += `<div class="day-info-muted">Brak wydarzeń historycznych dla tej daty.</div>`;
+    html += `<div class="day-info-muted">Nie udało się pobrać kalendarium historycznego związanego z Polską dla tej daty.</div>`;
   }
 
   html += `</div>`;
@@ -1228,7 +1380,7 @@ function openDay(i) {
 
     const badge = document.createElement("div");
     badge.className = "plan-badge";
-    badge.innerHTML = `Схема ліків: ${plan ? escapeHtml(plan.name) : "—"}<small>Діє z ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
+    badge.innerHTML = `Схема ліків: ${plan ? escapeHtml(plan.name) : "—"}<small>Діє з ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
     c.appendChild(badge);
 
     refreshDayButtonState(i);
@@ -1457,7 +1609,7 @@ function renderQuoteList() {
         <div class="quote-item-text">${escapeHtml(quote)}</div>
         <button class="quote-delete-btn" data-quote-index="${index}">Видалити</button>
       </div>
-      <small>Власна фраза</small>
+      <small>Власna фраза</small>
     `;
 
     box.appendChild(item);
