@@ -296,15 +296,6 @@ textarea {
   font-style: italic;
 }
 
-.day-info-error {
-  color: #9a2f2f;
-  background: #fff2f2;
-  border: 1px solid #efcaca;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-style: normal;
-}
-
 .day-info-note {
   color: #555;
   background: #f7f7f7;
@@ -821,6 +812,9 @@ const localHistoricalEvents = {
   ],
   "11-11": [
     { year: "1918", text: "Polska odzyskała niepodległość." }
+  ],
+  "12-24": [
+    { year: "1818", text: "Po raz pierwszy wykonano kolędę „Cicha noc”." }
   ]
 };
 
@@ -868,7 +862,7 @@ function refreshDayButtonState(i) {
   btn.classList.add("active-day");
 }
 
-// === 5.1. Утиліти для безпечного fetch ===
+// === 5.1. Утиліти ===
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -878,7 +872,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+async function fetchJsonWithTimeout(url, timeoutMs = 7000, extraHeaders = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -886,7 +880,10 @@ async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
     const response = await fetch(url, {
       method: "GET",
       cache: "no-store",
-      signal: controller.signal
+      signal: controller.signal,
+      headers: {
+        ...extraHeaders
+      }
     });
 
     if (!response.ok) {
@@ -908,22 +905,10 @@ function formatDayInfoDate(dateObj) {
   }));
 }
 
-function getHistoryErrorMessage(err) {
-  const msg = String(err && err.message ? err.message : err || "");
-
-  if (msg.includes("AbortError")) {
-    return "Zewnętrzny serwis historyczny nie odpowiedział na czas.";
-  }
-
-  if (msg.includes("Failed to fetch")) {
-    return "Nie udało się połączyć z zewnętrznym serwisem historycznym.";
-  }
-
-  if (msg.includes("HTTP")) {
-    return `Zewnętrzny serwis historyczny zwrócił błąd: ${escapeHtml(msg)}.`;
-  }
-
-  return `Błąd pobierania danych historycznych: ${escapeHtml(msg || "nieznany błąd")}.`;
+function getWikimediaHeaders() {
+  return {
+    "Api-User-Agent": "TodayIsTheDayDiary/1.0 (GitHub Pages)"
+  };
 }
 
 // === 6. Побудова розкладу дня ===
@@ -1120,9 +1105,7 @@ async function loadDayInfo(dateObj) {
   `;
 
   let holidays = [];
-  let holidaysError = "";
   let historyEvents = [];
-  let historyError = "";
   let historySource = "";
 
   try {
@@ -1132,33 +1115,43 @@ async function loadDayInfo(dateObj) {
       : [];
   } catch (e) {
     console.error("Błąd pobierania świąt:", e);
-    holidaysError = "Nie udało się pobrać oficjalnych świąt z zewnętrznego serwisu.";
   }
 
   try {
-    const historyData = await fetchJsonWithTimeout(`https://byabbe.se/on-this-day/${month}/${day}/events.json`, 7000);
-    historyEvents = Array.isArray(historyData?.events)
-      ? historyData.events.slice(0, 5).map(ev => ({
-          year: ev.year,
-          text: ev.description
-        }))
-      : [];
+    const historyData = await fetchJsonWithTimeout(
+      `https://api.wikimedia.org/feed/v1/wikipedia/en/onthisday/all/${month}/${day}`,
+      7000,
+      getWikimediaHeaders()
+    );
+
+    const selected = Array.isArray(historyData?.selected) ? historyData.selected : [];
+    const events = Array.isArray(historyData?.events) ? historyData.events : [];
+
+    const merged = [...selected, ...events]
+      .filter(ev => ev && typeof ev.year !== "undefined" && typeof ev.text === "string");
+
+    const seen = new Set();
+    historyEvents = merged.filter(ev => {
+      const key = `${ev.year}|${ev.text}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 5).map(ev => ({
+      year: ev.year,
+      text: ev.text
+    }));
 
     if (historyEvents.length) {
-      historySource = "Źródło: zewnętrzny serwis historyczny.";
-    } else {
-      historyEvents = localHistoricalEvents[md] || [];
-      if (historyEvents.length) {
-        historySource = "Źródło: lokalny zestaw awaryjny.";
-      }
+      historySource = "Źródło: Wikimedia On this day.";
     }
   } catch (e) {
     console.error("Błąd pobierania wydarzeń historycznych:", e);
-    historyError = getHistoryErrorMessage(e);
+  }
 
+  if (!historyEvents.length) {
     historyEvents = localHistoricalEvents[md] || [];
     if (historyEvents.length) {
-      historySource = "Pokazano lokalny zestaw awaryjny, bo zewnętrzny serwis nie odpowiedział poprawnie.";
+      historySource = "Źródło: lokalny zestaw awaryjny.";
     }
   }
 
@@ -1185,17 +1178,6 @@ async function loadDayInfo(dateObj) {
     });
 
     html += "</ul>";
-  } else if (holidaysError) {
-    if (specialDays.length) {
-      html += "<ul>";
-      specialDays.forEach(d => {
-        html += `<li>${escapeHtml(d)}</li>`;
-      });
-      html += "</ul>";
-      html += `<div class="day-info-note">${escapeHtml(holidaysError)}</div>`;
-    } else {
-      html += `<div class="day-info-error">${escapeHtml(holidaysError)}</div>`;
-    }
   } else {
     html += `<div class="day-info-muted">Brak oficjalnego święta państwowego ani znanej daty okolicznościowej.</div>`;
   }
@@ -1214,12 +1196,6 @@ async function loadDayInfo(dateObj) {
     if (historySource) {
       html += `<div class="day-info-note">${escapeHtml(historySource)}</div>`;
     }
-
-    if (historyError) {
-      html += `<div class="day-info-note">${escapeHtml(historyError)}</div>`;
-    }
-  } else if (historyError) {
-    html += `<div class="day-info-error">${escapeHtml(historyError)}</div>`;
   } else {
     html += `<div class="day-info-muted">Brak wydarzeń historycznych dla tej daty.</div>`;
   }
@@ -1252,7 +1228,7 @@ function openDay(i) {
 
     const badge = document.createElement("div");
     badge.className = "plan-badge";
-    badge.innerHTML = `Схема ліків: ${plan ? escapeHtml(plan.name) : "—"}<small>Діє з ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
+    badge.innerHTML = `Схема ліків: ${plan ? escapeHtml(plan.name) : "—"}<small>Діє z ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
     c.appendChild(badge);
 
     refreshDayButtonState(i);
