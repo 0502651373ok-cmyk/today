@@ -296,6 +296,24 @@ textarea {
   font-style: italic;
 }
 
+.day-info-error {
+  color: #9a2f2f;
+  background: #fff2f2;
+  border: 1px solid #efcaca;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-style: normal;
+}
+
+.day-info-note {
+  color: #555;
+  background: #f7f7f7;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.93em;
+}
+
 #polishPanel {
   margin-top: 18px;
   padding-top: 16px;
@@ -655,6 +673,7 @@ let data = JSON.parse(localStorage.getItem("trackerData")) || [];
 let currentMonth = today.getMonth();
 let currentYear = today.getFullYear();
 let currentOpenedIndex = todayIndex;
+let currentDayInfoRequestId = 0;
 
 // === 2. Схеми ліків ===
 function getDefaultMedicinePlans() {
@@ -782,6 +801,29 @@ const polishSpecialDays = {
   "12-31": ["Sylwester"]
 };
 
+// === 4.1. Локальний fallback для історичних подій ===
+const localHistoricalEvents = {
+  "01-01": [
+    { year: "1801", text: "Powstało Zjednoczone Królestwo Wielkiej Brytanii i Irlandii." }
+  ],
+  "03-08": [
+    { year: "1910", text: "Upowszechniła się idea Międzynarodowego Dnia Kobiet w Europie." },
+    { year: "1917", text: "Demonstracje kobiet w Piotrogrodzie stały się jednym z impulsów wydarzeń rewolucyjnych." }
+  ],
+  "05-03": [
+    { year: "1791", text: "Uchwalono Konstytucję 3 maja." }
+  ],
+  "08-01": [
+    { year: "1944", text: "Rozpoczęło się Powstanie Warszawskie." }
+  ],
+  "09-01": [
+    { year: "1939", text: "Niemcy zaatakowały Polskę, rozpoczynając II wojnę światową." }
+  ],
+  "11-11": [
+    { year: "1918", text: "Polska odzyskała niepodległość." }
+  ]
+};
+
 // === 5. Прогрес-бар ===
 function updateProgress() {
   let total = 0;
@@ -826,15 +868,77 @@ function refreshDayButtonState(i) {
   btn.classList.add("active-day");
 }
 
+// === 5.1. Утиліти для безпечного fetch ===
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function formatDayInfoDate(dateObj) {
+  return capitalizeFirst(dateObj.toLocaleDateString("pl-PL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }));
+}
+
+function getHistoryErrorMessage(err) {
+  const msg = String(err && err.message ? err.message : err || "");
+
+  if (location.protocol === "file:") {
+    return "Przeglądarka zablokowała pobieranie danych z zewnętrznego serwisu przy uruchomieniu lokalnego pliku HTML.";
+  }
+
+  if (msg.includes("AbortError")) {
+    return "Zewnętrzny serwis historyczny nie odpowiedział na czas.";
+  }
+
+  if (msg.includes("Failed to fetch")) {
+    return "Nie udało się połączyć z zewnętrznym serwisem historycznym.";
+  }
+
+  if (msg.includes("HTTP")) {
+    return `Zewnętrzny serwis historyczny zwrócił błąd: ${escapeHtml(msg)}.`;
+  }
+
+  return `Błąd pobierania danych historycznych: ${escapeHtml(msg || "nieznany błąd")}.`;
+}
+
 // === 6. Побудова розкладу дня ===
 function getCosmeticsForWeekday(weekday) {
   const cosmetics = [
-    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ z Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
     {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
     {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
     {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["EMS-L z Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L z Dermogal A+E albo Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H z Retinol Collagen Complex","Після D-Пантенол"]},
     {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
   ];
   return cosmetics[weekday];
@@ -998,6 +1102,8 @@ async function loadDayInfo(dateObj) {
   const box = document.getElementById("dayInfoContent");
   if (!box) return;
 
+  const requestId = ++currentDayInfoRequestId;
+
   const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, "0");
   const day = String(dateObj.getDate()).padStart(2, "0");
@@ -1006,14 +1112,7 @@ async function loadDayInfo(dateObj) {
   const specialDays = polishSpecialDays[md] || [];
 
   box.innerHTML = `
-    <div class="day-info-date">
-      ${capitalizeFirst(dateObj.toLocaleDateString("pl-PL", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      }))}
-    </div>
+    <div class="day-info-date">${formatDayInfoDate(dateObj)}</div>
     <div class="day-info-block">
       <h4>Polska</h4>
       <div class="day-info-muted">Ładowanie informacji...</div>
@@ -1025,40 +1124,52 @@ async function loadDayInfo(dateObj) {
   `;
 
   let holidays = [];
+  let holidaysError = "";
   let historyEvents = [];
+  let historyError = "";
+  let historySource = "";
 
   try {
-    const holidayRes = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`);
-    if (holidayRes.ok) {
-      const holidayData = await holidayRes.json();
-      holidays = holidayData.filter(h => h.date === `${year}-${month}-${day}`);
-    }
+    const holidayData = await fetchJsonWithTimeout(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`, 7000);
+    holidays = Array.isArray(holidayData)
+      ? holidayData.filter(h => h.date === `${year}-${month}-${day}`)
+      : [];
   } catch (e) {
     console.error("Błąd pobierania świąt:", e);
+    holidaysError = "Nie udało się pobrać oficjalnych świąt z zewnętrznego serwisu.";
   }
 
   try {
-    const historyRes = await fetch(`https://byabbe.se/on-this-day/${month}/${day}/events.json`);
-    if (historyRes.ok) {
-      const historyData = await historyRes.json();
-      historyEvents = (historyData.events || []).slice(0, 5).map(ev => ({
-        year: ev.year,
-        text: ev.description
-      }));
+    const historyData = await fetchJsonWithTimeout(`https://byabbe.se/on-this-day/${month}/${day}/events.json`, 7000);
+    historyEvents = Array.isArray(historyData?.events)
+      ? historyData.events.slice(0, 5).map(ev => ({
+          year: ev.year,
+          text: ev.description
+        }))
+      : [];
+
+    if (historyEvents.length) {
+      historySource = "Źródło: zewnętrzny serwis historyczny.";
+    } else {
+      historyEvents = localHistoricalEvents[md] || [];
+      if (historyEvents.length) {
+        historySource = "Źródło: lokalny zestaw awaryjny.";
+      }
     }
   } catch (e) {
     console.error("Błąd pobierania wydarzeń historycznych:", e);
+    historyError = getHistoryErrorMessage(e);
+
+    historyEvents = localHistoricalEvents[md] || [];
+    if (historyEvents.length) {
+      historySource = "Pokazano lokalny zestaw awaryjny, bo zewnętrzny serwis nie odpowiedział poprawnie.";
+    }
   }
 
+  if (requestId !== currentDayInfoRequestId) return;
+
   let html = `
-    <div class="day-info-date">
-      ${capitalizeFirst(dateObj.toLocaleDateString("pl-PL", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      }))}
-    </div>
+    <div class="day-info-date">${formatDayInfoDate(dateObj)}</div>
   `;
 
   html += `<div class="day-info-block"><h4>Polska</h4>`;
@@ -1067,17 +1178,28 @@ async function loadDayInfo(dateObj) {
     html += "<ul>";
 
     holidays.forEach(h => {
-      html += `<li>${h.localName}</li>`;
+      html += `<li>${escapeHtml(h.localName || h.name || "")}</li>`;
     });
 
     specialDays.forEach(d => {
       const exists = holidays.some(h => h.localName === d || h.name === d);
       if (!exists) {
-        html += `<li>${d}</li>`;
+        html += `<li>${escapeHtml(d)}</li>`;
       }
     });
 
     html += "</ul>";
+  } else if (holidaysError) {
+    if (specialDays.length) {
+      html += "<ul>";
+      specialDays.forEach(d => {
+        html += `<li>${escapeHtml(d)}</li>`;
+      });
+      html += "</ul>";
+      html += `<div class="day-info-note">${escapeHtml(holidaysError)}</div>`;
+    } else {
+      html += `<div class="day-info-error">${escapeHtml(holidaysError)}</div>`;
+    }
   } else {
     html += `<div class="day-info-muted">Brak oficjalnego święta państwowego ani znanej daty okolicznościowej.</div>`;
   }
@@ -1089,11 +1211,21 @@ async function loadDayInfo(dateObj) {
   if (historyEvents.length) {
     html += "<ul>";
     historyEvents.forEach(ev => {
-      html += `<li>${ev.year}: ${ev.text}</li>`;
+      html += `<li>${escapeHtml(ev.year)}: ${escapeHtml(ev.text)}</li>`;
     });
     html += "</ul>";
+
+    if (historySource) {
+      html += `<div class="day-info-note">${escapeHtml(historySource)}</div>`;
+    }
+
+    if (historyError) {
+      html += `<div class="day-info-note">${escapeHtml(historyError)}</div>`;
+    }
+  } else if (historyError) {
+    html += `<div class="day-info-error">${escapeHtml(historyError)}</div>`;
   } else {
-    html += `<div class="day-info-muted">Nie udało się pobrać wydarzeń historycznych.</div>`;
+    html += `<div class="day-info-muted">Brak wydarzeń historycznych dla tej daty.</div>`;
   }
 
   html += `</div>`;
@@ -1124,14 +1256,14 @@ function openDay(i) {
 
     const badge = document.createElement("div");
     badge.className = "plan-badge";
-    badge.innerHTML = `Схема ліків: ${plan ? plan.name : "—"}<small>Діє з ${plan ? plan.effectiveFrom : "—"}</small>`;
+    badge.innerHTML = `Схема ліків: ${plan ? escapeHtml(plan.name) : "—"}<small>Діє з ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
     c.appendChild(badge);
 
     refreshDayButtonState(i);
 
     for (const [title, items] of Object.entries(schedule)) {
       const sec = document.createElement("section");
-      sec.innerHTML = "<h3>" + title + "</h3>";
+      sec.innerHTML = "<h3>" + escapeHtml(title) + "</h3>";
 
       items.forEach(txt => {
         const key = title + "_" + txt;
@@ -1228,13 +1360,13 @@ function renderMedicinePlans() {
     const card = document.createElement("div");
     card.className = "plan-card";
 
-    const m = (plan.morning || []).map(x => `<li>${x}</li>`).join("");
-    const d = (plan.day || []).map(x => `<li>${x}</li>`).join("");
-    const e = (plan.evening || []).map(x => `<li>${x}</li>`).join("");
+    const m = (plan.morning || []).map(x => `<li>${escapeHtml(x)}</li>`).join("");
+    const d = (plan.day || []).map(x => `<li>${escapeHtml(x)}</li>`).join("");
+    const e = (plan.evening || []).map(x => `<li>${escapeHtml(x)}</li>`).join("");
 
     card.innerHTML = `
-      <h4>${plan.name}</h4>
-      <small>Діє з: ${plan.effectiveFrom}</small>
+      <h4>${escapeHtml(plan.name)}</h4>
+      <small>Діє з: ${escapeHtml(plan.effectiveFrom)}</small>
       <div><span>Ранок:</span><ul>${m || "<li>—</li>"}</ul></div>
       <div><span>День:</span><ul>${d || "<li>—</li>"}</ul></div>
       <div><span>Вечір:</span><ul>${e || "<li>—</li>"}</ul></div>
@@ -1350,7 +1482,7 @@ function renderQuoteList() {
 
     item.innerHTML = `
       <div class="quote-item-top">
-        <div class="quote-item-text">${quote}</div>
+        <div class="quote-item-text">${escapeHtml(quote)}</div>
         <button class="quote-delete-btn" data-quote-index="${index}">Видалити</button>
       </div>
       <small>Власна фраза</small>
@@ -1459,6 +1591,8 @@ document.getElementById("exportBtn").onclick = function() {
   a.href = URL.createObjectURL(blob);
   a.download = "TodayIsTheDay_Щоденник.docx";
   a.click();
+
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 
 // === 14. Старт ===
