@@ -23,6 +23,7 @@ body {
   margin: 0;
   text-align: center;
 }
+
 header {
   background: linear-gradient(90deg, #ffee58, #aee571);
   padding: 15px;
@@ -30,6 +31,49 @@ header {
   font-weight: bold;
   color: #33691e;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.quote {
+  text-align: right;
+  font-style: italic;
+  font-size: 1.1em;
+  color: #33691e;
+  margin: 10px 20px 0 0;
+}
+
+#progressBar {
+  width: min(90%, 1400px);
+  height: 20px;
+  background: #cfd8dc;
+  border-radius: 10px;
+  margin: 15px auto;
+  overflow: hidden;
+}
+
+#progressFill {
+  height: 100%;
+  width: 0%;
+  background: #9ccc65;
+  transition: width 0.3s;
+}
+
+#progressText {
+  margin: 8px 0 12px;
+}
+
+#appLayout {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+  padding: 0 15px 20px;
+  box-sizing: border-box;
+}
+
+#mainColumn {
+  min-width: 0;
 }
 
 #calendar {
@@ -42,24 +86,26 @@ header {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 12px;
+  gap: 28px;
   margin-bottom: 14px;
 }
 
 .calendar-title {
-  min-width: 220px;
+  min-width: 320px;
   font-size: 1.2em;
   color: #33691e;
-  text-transform: capitalize;
+  text-transform: none;
 }
 
 .calendar-nav {
   background: #8bc34a;
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 8px 12px;
+  border-radius: 12px;
+  padding: 10px 18px;
   cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
 }
 
 .calendar-grid {
@@ -90,6 +136,7 @@ header {
   transition: 0.2s;
   white-space: pre-line;
 }
+
 .day-btn:hover { background: #dcedc8; }
 .day-btn.done { background: #c5e1a5; }
 .day-btn.today {
@@ -98,6 +145,11 @@ header {
 .day-btn.outside-range {
   opacity: 0.45;
   cursor: default;
+}
+.day-btn.active-day {
+  background: #aed581 !important;
+  border: 2px solid #558b2f;
+  transform: scale(1.05);
 }
 
 #content {
@@ -109,9 +161,21 @@ header {
   box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   text-align: left;
 }
-h2 { color: #558b2f; text-align: center; }
-section { margin-bottom: 15px; }
-label { display: block; margin: 4px 0; }
+
+h2 {
+  color: #558b2f;
+  text-align: center;
+}
+
+section {
+  margin-bottom: 15px;
+}
+
+label {
+  display: block;
+  margin: 4px 0;
+}
+
 button.back {
   margin-top: 15px;
   background: #8bc34a;
@@ -121,27 +185,18 @@ button.back {
   padding: 8px 15px;
   cursor: pointer;
 }
-#progressBar {
-  width: 80%;
-  height: 20px;
-  background: #cfd8dc;
-  border-radius: 10px;
-  margin: 15px auto;
-  overflow: hidden;
+
+button.export {
+  background: #689f38;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 15px;
+  cursor: pointer;
+  margin: 10px auto 0;
+  display: inline-block;
 }
-#progressFill {
-  height: 100%;
-  width: 0%;
-  background: #9ccc65;
-  transition: width 0.3s;
-}
-.quote {
-  text-align: right;
-  font-style: italic;
-  font-size: 1.1em;
-  color: #33691e;
-  margin: 10px 20px 0 0;
-}
+
 textarea {
   width: 100%;
   height: 150px;
@@ -151,36 +206,71 @@ textarea {
   padding: 10px;
   font-family: inherit;
   resize: vertical;
-}
-button.export {
-  background: #689f38;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 15px;
-  cursor: pointer;
-  margin-top: 10px;
-}
-.day-btn.active-day {
-  background: #aed581 !important;
-  border: 2px solid #558b2f;
-  transform: scale(1.05);
-}
-#appLayout {
-  max-width: 1500px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 20px;
-  align-items: start;
+  box-sizing: border-box;
 }
 
 #dayInfo {
   background: #fff;
   border-radius: 12px;
-  padding: 15px;
+  padding: 18px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.2);
   text-align: left;
+  position: sticky;
+  top: 15px;
+  min-height: 260px;
+}
+
+#dayInfo h3 {
+  margin-top: 0;
+  color: #558b2f;
+  text-align: center;
+}
+
+#dayInfoContent {
+  font-size: 0.98em;
+  line-height: 1.45;
+}
+
+.day-info-date {
+  font-size: 1.05em;
+  color: #33691e;
+  margin-bottom: 12px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.day-info-block {
+  margin-bottom: 16px;
+}
+
+.day-info-block h4 {
+  margin: 0 0 8px 0;
+  color: #558b2f;
+  font-size: 1em;
+}
+
+.day-info-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.day-info-block li {
+  margin-bottom: 6px;
+}
+
+.day-info-muted {
+  color: #666;
+  font-style: italic;
+}
+
+@media (max-width: 1200px) {
+  #appLayout {
+    grid-template-columns: 1fr;
+  }
+
+  #dayInfo {
+    position: static;
+  }
 }
 </style>
 </head>
@@ -192,20 +282,16 @@ button.export {
 <div id="progressText"></div>
 
 <div id="appLayout">
-
   <div id="mainColumn">
     <div id="calendar"></div>
     <div id="content" style="display:none"></div>
-    <button class="export" id="exportBtn">
-      💾 Завантажити щоденник (.docx)
-    </button>
+    <button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
   </div>
 
   <aside id="dayInfo">
     <h3>O tym dniu</h3>
     <div id="dayInfoContent">Wybierz dzień w kalendarzu.</div>
   </aside>
-
 </div>
 
 <script>
@@ -222,16 +308,15 @@ startDate.setHours(0,0,0,0);
 const today = new Date();
 today.setHours(0,0,0,0);
 
-let diffDays = Math.floor((today - startDate) / (1000*60*60*24));
+let diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
 if (diffDays < 0) diffDays = 0;
 
 const todayIndex = diffDays;
-
 let data = JSON.parse(localStorage.getItem("trackerData")) || [];
 
-function ensureDayExists(i){
+function ensureDayExists(i) {
   while (data.length <= i) {
-    data.push({tasks:{}, diary:""});
+    data.push({ tasks: {}, diary: "" });
   }
 }
 
@@ -240,100 +325,98 @@ ensureDayExists(todayIndex);
 let currentMonth = today.getMonth();
 let currentYear = today.getFullYear();
 
-async function saveData(){
+function saveData() {
   localStorage.setItem("trackerData", JSON.stringify(data));
   updateProgress();
-
-  const token = "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";
-  const gistIdKey = "todayIsTheDayGistId";
-  let gistId = localStorage.getItem(gistIdKey);
-
-  const gistContent = JSON.stringify({
-    startDate: localStorage.getItem("trackerStartDate"),
-    data: data
-  }, null, 2);
-
-  const payload = {
-    description: "☀️ Today Is The Day — повний щоденник прогресу",
-    public: false,
-    files: {
-      "month_log.json": { content: gistContent }
-    }
-  };
-
-  try {
-    let res;
-    if (gistId) {
-      res = await fetch(`https://api.github.com/gists/${gistId}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `token ${token}`,
-          "Accept": "application/vnd.github.v3+json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-    } else {
-      res = await fetch("https://api.github.com/gists", {
-        method: "POST",
-        headers: {
-          "Authorization": `token ${token}`,
-          "Accept": "application/vnd.github.v3+json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-    }
-
-    const json = await res.json();
-
-    if (!gistId && json.id) {
-      localStorage.setItem(gistIdKey, json.id);
-      console.log("🆕 Створено новий Gist:", json.html_url);
-    } else {
-      console.log("✅ Оновлено Gist:", json.html_url);
-    }
-
-  } catch (e) {
-    console.error("❌ Помилка при збереженні у Gist:", e);
-  }
 }
 
 // === 2. Фрази дня ===
 const quotes = [
-"Nie zatrzymuj się – nawet jeśli dziś boli.",
-"Ти не там, де була. І це вже перемога.",
-"Jeszcze nic nie jest skończone.",
-"Не бійся, якщо повільно — бійся стояти.",
-"Żyjesz – to znaczy, możesz jeszcze zacząć.",
-"Навіть маленький рух – це вже шлях.",
-"Kiedyś będziesz wdzięczna, że не здалась dziś.",
-"Ти не втратила — ти змінилась.",
-"Nawet mały krok – to też kierunek.",
-"Все, що потрібно, – це ще один ранок, щоб спробувати."
+  "Nie zatrzymuj się – nawet jeśli dziś boli.",
+  "Jeszcze nic nie jest skończone.",
+  "Żyjesz – to znaczy, możesz jeszcze zacząć.",
+  "Nawet mały krok – to też kierunek.",
+  "To, że dziś jest trudno, nie oznacza, że się cofasz.",
+  "Nie wszystko musi być idealne, żeby miało sens.",
+  "Nie musisz przyspieszać. Wystarczy, że idziesz.",
+  "Twoje tempo też jest tempem.",
+  "Stabilność to też postęp.",
+  "Największy postęp dzieje się wtedy, gdy nikt go nie widzi."
 ];
-document.getElementById("quote").innerText =
-  quotes[Math.floor(Math.random()*quotes.length)];
 
-// === 3. Прогрес-бар ===
-function updateProgress(){
-  let total = 0, done = 0;
+document.getElementById("quote").innerText =
+  quotes[Math.floor(Math.random() * quotes.length)];
+
+// === 3. Польські дати ===
+const polishSpecialDays = {
+  "01-01": ["Nowy Rok"],
+  "01-06": ["Święto Trzech Króli"],
+  "02-14": ["Walentynki"],
+  "03-08": ["Dzień Kobiet"],
+  "04-01": ["Prima Aprilis"],
+  "05-01": ["Święto Pracy"],
+  "05-02": ["Dzień Flagi Rzeczypospolitej Polskiej"],
+  "05-03": ["Święto Konstytucji 3 Maja"],
+  "05-26": ["Dzień Matki"],
+  "06-01": ["Dzień Dziecka"],
+  "06-23": ["Dzień Ojca"],
+  "08-01": ["Rocznica wybuchu Powstania Warszawskiego"],
+  "08-15": ["Święto Wojska Polskiego", "Wniebowzięcie Najświętszej Maryi Panny"],
+  "09-01": ["Rocznica wybuchu II wojny światowej"],
+  "10-14": ["Dzień Edukacji Narodowej"],
+  "11-01": ["Wszystkich Świętych"],
+  "11-11": ["Narodowe Święto Niepodległości"],
+  "11-30": ["Andrzejki"],
+  "12-06": ["Mikołajki"],
+  "12-24": ["Wigilia"],
+  "12-25": ["Boże Narodzenie"],
+  "12-26": ["Drugi dzień Bożego Narodzenia"],
+  "12-31": ["Sylwester"]
+};
+
+// === 4. Прогрес-бар ===
+function updateProgress() {
+  let total = 0;
+  let done = 0;
+
   data.forEach(day => {
     for (const t in day.tasks) {
       total++;
       if (day.tasks[t]) done++;
     }
   });
+
   const percent = total ? Math.round(done / total * 100) : 0;
   document.getElementById("progressFill").style.width = percent + "%";
   document.getElementById("progressText").innerText = "Виконано: " + percent + "%";
 }
 
-// === 4. Календар ===
-function showCalendar(selectedIndex = null){
+function capitalizeFirst(str) {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function getMonthTitle(year, month) {
+  const monthName = new Date(year, month, 1).toLocaleDateString("uk-UA", { month: "long" });
+  return `${capitalizeFirst(monthName)} ${year} р.`;
+}
+
+function refreshDayButtonState(i) {
+  const btn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
+  if (!btn) return;
+
+  const tasks = data[i]?.tasks || {};
+  const isDone = Object.keys(tasks).length > 0 && Object.values(tasks).every(Boolean);
+
+  btn.classList.toggle("done", isDone);
+  document.querySelectorAll(".day-btn").forEach(x => x.classList.remove("active-day"));
+  btn.classList.add("active-day");
+}
+
+// === 5. Календар ===
+function showCalendar(selectedIndex = null) {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
-  document.getElementById("content").style.display = "none";
 
   const header = document.createElement("div");
   header.className = "calendar-header";
@@ -352,8 +435,7 @@ function showCalendar(selectedIndex = null){
 
   const title = document.createElement("div");
   title.className = "calendar-title";
-  title.textContent = new Date(currentYear, currentMonth, 1)
-    .toLocaleDateString("uk-UA", {month: "long", year: "numeric"});
+  title.textContent = getMonthTitle(currentYear, currentMonth);
 
   const nextBtn = document.createElement("button");
   nextBtn.className = "calendar-nav";
@@ -395,12 +477,12 @@ function showCalendar(selectedIndex = null){
     const cellDate = new Date(currentYear, currentMonth, day);
     cellDate.setHours(0,0,0,0);
 
-    const index = Math.floor((cellDate - startDate) / (1000*60*60*24));
+    const index = Math.floor((cellDate - startDate) / (1000 * 60 * 60 * 24));
     const btn = document.createElement("button");
     btn.className = "day-btn";
 
     btn.innerText =
-      `${cellDate.getDate()} ${cellDate.toLocaleString("uk-UA",{month:"short"})}\n(${cellDate.toLocaleString("uk-UA",{weekday:"short"})})`;
+      `${cellDate.getDate()} ${cellDate.toLocaleString("uk-UA", { month: "short" })}\n(${cellDate.toLocaleString("uk-UA", { weekday: "short" })})`;
 
     if (cellDate.toDateString() === today.toDateString()) {
       btn.classList.add("today");
@@ -410,12 +492,9 @@ function showCalendar(selectedIndex = null){
       ensureDayExists(index);
       btn.dataset.dayIndex = index;
 
-      if (
-        Object.keys(data[index].tasks).length &&
-        Object.values(data[index].tasks).every(Boolean)
-      ) {
-        btn.classList.add("done");
-      }
+      const tasks = data[index].tasks || {};
+      const isDone = Object.keys(tasks).length > 0 && Object.values(tasks).every(Boolean);
+      if (isDone) btn.classList.add("done");
 
       if (selectedIndex === index) {
         btn.classList.add("active-day");
@@ -433,144 +512,247 @@ function showCalendar(selectedIndex = null){
   cal.appendChild(grid);
 }
 
-// === 5. Відкриття дня ===
-function openDay(i){
-  ensureDayExists(i);
+// === 6. Блок справа ===
+async function loadDayInfo(dateObj) {
+  const box = document.getElementById("dayInfoContent");
+  if (!box) return;
 
-  const c = document.getElementById("content");
-  const d = new Date(startDate);
-  loadDayInfo(d);
-  d.setDate(startDate.getDate() + i);
-  d.setHours(0,0,0,0);
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  const md = `${month}-${day}`;
 
-  const weekday = d.getDay() === 0 ? 6 : d.getDay() - 1;
-  const weekDays = ["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
-  const dayName = weekDays[weekday];
+  const specialDays = polishSpecialDays[md] || [];
 
-  const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
-  c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
+  box.innerHTML = `
+    <div class="day-info-date">
+      ${capitalizeFirst(dateObj.toLocaleDateString("pl-PL", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }))}
+    </div>
+    <div class="day-info-block">
+      <h4>Polska</h4>
+      <div class="day-info-muted">Ładowanie informacji...</div>
+    </div>
+    <div class="day-info-block">
+      <h4>Wydarzenia historyczne</h4>
+      <div class="day-info-muted">Ładowanie informacji...</div>
+    </div>
+  `;
 
-  document.querySelectorAll(".day-btn").forEach(btn => btn.classList.remove("active-day"));
-  const activeBtn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
-  if (activeBtn) activeBtn.classList.add("active-day");
+  let holidays = [];
+  let historyEvents = [];
 
-  const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
-  const dayCleaning = cleaningSchedule[weekday];
-  const workout = i % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
-
-  const cosmetics = [
-    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
-    {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
-    {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
-  ];
-  const dcos = cosmetics[weekday];
-
-  const schedule = {
-    РАНОК: [
-      "☕ Кава з молоком",
-      "Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max",
-      "Зарядка для шиї 20 хв + Ляпко 20 хв",
-      ...dcos.morning
-    ],
-    ДЕНЬ: [
-      workout,
-      "Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша",
-      ...dcos.day
-    ],
-    ВЕЧІР: [
-      "Magnesium bisglycinate, L-Tryptophan, Розторопша",
-      "Розтяжка + дихальні вправи",
-      ...dcos.evening
-    ]
-  };
-
-  for (const [title, items] of Object.entries(schedule)) {
-    const sec = document.createElement("section");
-    sec.innerHTML = "<h3>" + title + "</h3>";
-
-    items.forEach(txt => {
-      const key = title + "_" + txt;
-      if (data[i].tasks[key] === undefined) data[i].tasks[key] = false;
-
-      const lbl = document.createElement("label");
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.checked = data[i].tasks[key];
-      chk.onchange = () => {
-        data[i].tasks[key] = chk.checked;
-        saveData();
-        updateProgress();
-        showCalendar(i);
-        const currentActiveBtn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
-        if (currentActiveBtn) currentActiveBtn.classList.add("active-day");
-        document.getElementById("content").style.display = "block";
-      };
-
-      lbl.appendChild(chk);
-      lbl.appendChild(document.createTextNode(" " + txt));
-      sec.appendChild(lbl);
-    });
-
-    c.appendChild(sec);
+  try {
+    const holidayRes = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`);
+    if (holidayRes.ok) {
+      const holidayData = await holidayRes.json();
+      holidays = holidayData.filter(h => h.date === `${year}-${month}-${day}`);
+    }
+  } catch (e) {
+    console.error("Błąd pobierania świąt:", e);
   }
 
-  const clSection = document.createElement("section");
-  clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
+  try {
+    const historyRes = await fetch(`https://pl.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`);
+    if (historyRes.ok) {
+      const historyData = await historyRes.json();
+      historyEvents = (historyData.events || []).slice(0, 5);
+    }
+  } catch (e) {
+    console.error("Błąd pobierania wydarzeń historycznych:", e);
+  }
 
-  const clKey = "ПРИБИРАННЯ_" + dayCleaning;
-  if (data[i].tasks[clKey] === undefined) data[i].tasks[clKey] = false;
+  let html = `
+    <div class="day-info-date">
+      ${capitalizeFirst(dateObj.toLocaleDateString("pl-PL", {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      }))}
+    </div>
+  `;
 
-  const clLabel = document.createElement("label");
-  const clCheckbox = document.createElement("input");
-  clCheckbox.type = "checkbox";
-  clCheckbox.checked = data[i].tasks[clKey];
-  clCheckbox.onchange = () => {
-    data[i].tasks[clKey] = clCheckbox.checked;
-    saveData();
-    updateProgress();
-    showCalendar(i);
-    const currentActiveBtn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
-    if (currentActiveBtn) currentActiveBtn.classList.add("active-day");
-    document.getElementById("content").style.display = "block";
-  };
+  html += `<div class="day-info-block"><h4>Polska</h4>`;
 
-  clLabel.appendChild(clCheckbox);
-  clLabel.appendChild(document.createTextNode(" " + dayCleaning));
-  clSection.appendChild(clLabel);
-  c.appendChild(clSection);
+  if (holidays.length || specialDays.length) {
+    html += "<ul>";
 
-  const diary = document.createElement("section");
-  diary.innerHTML = "<h3>ЩОДЕННИК</h3>";
-  const ta = document.createElement("textarea");
-  ta.value = data[i].diary || "";
-  ta.placeholder = "Запиши, як минув день...";
-  ta.oninput = () => {
-    data[i].diary = ta.value;
-    saveData();
-  };
-  diary.appendChild(ta);
-  c.appendChild(diary);
+    holidays.forEach(h => {
+      html += `<li>${h.localName}</li>`;
+    });
 
-  const back = document.createElement("button");
-  back.className = "back";
-  back.innerText = "← Назад до календаря";
-  back.onclick = () => {
-    currentMonth = d.getMonth();
-    currentYear = d.getFullYear();
-    showCalendar(i);
-  };
-  c.appendChild(back);
+    specialDays.forEach(d => {
+      const exists = holidays.some(h => h.localName === d || h.name === d);
+      if (!exists) {
+        html += `<li>${d}</li>`;
+      }
+    });
 
-  c.style.display = "block";
+    html += "</ul>";
+  } else {
+    html += `<div class="day-info-muted">Brak oficjalnego święta państwowego ani znanej daty okolicznościowej.</div>`;
+  }
+
+  html += `</div>`;
+
+  html += `<div class="day-info-block"><h4>Wydarzenia historyczne</h4>`;
+
+  if (historyEvents.length) {
+    html += "<ul>";
+    historyEvents.forEach(ev => {
+      html += `<li>${ev.year}: ${ev.text}</li>`;
+    });
+    html += "</ul>";
+  } else {
+    html += `<div class="day-info-muted">Nie udało się pobrać wydarzeń historycznych.</div>`;
+  }
+
+  html += `</div>`;
+
+  box.innerHTML = html;
 }
 
-// === 6. Експорт у DOCX ===
-document.getElementById("exportBtn").onclick = function(){
+// === 7. Відкриття дня ===
+function openDay(i) {
+  try {
+    ensureDayExists(i);
+
+    const c = document.getElementById("content");
+    const d = new Date(startDate);
+    d.setDate(startDate.getDate() + i);
+    d.setHours(0,0,0,0);
+
+    const weekday = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    const weekDays = ["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
+    const dayName = weekDays[weekday];
+
+    const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
+    c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
+
+    refreshDayButtonState(i);
+
+    const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
+    const dayCleaning = cleaningSchedule[weekday];
+    const workout = i % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
+
+    const cosmetics = [
+      {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+      {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
+      {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
+      {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+      {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
+      {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
+      {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
+    ];
+    const dcos = cosmetics[weekday];
+
+    const schedule = {
+      РАНОК: [
+        "☕ Кава з молоком",
+        "Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max",
+        "Зарядка для шиї 20 хв + Ляпко 20 хв",
+        ...dcos.morning
+      ],
+      ДЕНЬ: [
+        workout,
+        "Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша",
+        ...dcos.day
+      ],
+      ВЕЧІР: [
+        "Magnesium bisglycinate, L-Tryptophan, Розторопша",
+        "Розтяжка + дихальні вправи",
+        ...dcos.evening
+      ]
+    };
+
+    for (const [title, items] of Object.entries(schedule)) {
+      const sec = document.createElement("section");
+      sec.innerHTML = "<h3>" + title + "</h3>";
+
+      items.forEach(txt => {
+        const key = title + "_" + txt;
+        if (data[i].tasks[key] === undefined) data[i].tasks[key] = false;
+
+        const lbl = document.createElement("label");
+        const chk = document.createElement("input");
+        chk.type = "checkbox";
+        chk.checked = data[i].tasks[key];
+        chk.onchange = () => {
+          data[i].tasks[key] = chk.checked;
+          saveData();
+          refreshDayButtonState(i);
+        };
+
+        lbl.appendChild(chk);
+        lbl.appendChild(document.createTextNode(" " + txt));
+        sec.appendChild(lbl);
+      });
+
+      c.appendChild(sec);
+    }
+
+    const clSection = document.createElement("section");
+    clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
+
+    const clKey = "ПРИБИРАННЯ_" + dayCleaning;
+    if (data[i].tasks[clKey] === undefined) data[i].tasks[clKey] = false;
+
+    const clLabel = document.createElement("label");
+    const clCheckbox = document.createElement("input");
+    clCheckbox.type = "checkbox";
+    clCheckbox.checked = data[i].tasks[clKey];
+    clCheckbox.onchange = () => {
+      data[i].tasks[clKey] = clCheckbox.checked;
+      saveData();
+      refreshDayButtonState(i);
+    };
+
+    clLabel.appendChild(clCheckbox);
+    clLabel.appendChild(document.createTextNode(" " + dayCleaning));
+    clSection.appendChild(clLabel);
+    c.appendChild(clSection);
+
+    const diary = document.createElement("section");
+    diary.innerHTML = "<h3>ЩОДЕННИК</h3>";
+    const ta = document.createElement("textarea");
+    ta.value = data[i].diary || "";
+    ta.placeholder = "Запиши, як минув день...";
+    ta.oninput = () => {
+      data[i].diary = ta.value;
+      saveData();
+    };
+    diary.appendChild(ta);
+    c.appendChild(diary);
+
+    const back = document.createElement("button");
+    back.className = "back";
+    back.innerText = "← Назад до календаря";
+    back.onclick = () => {
+      currentMonth = d.getMonth();
+      currentYear = d.getFullYear();
+      showCalendar(i);
+      document.getElementById("content").style.display = "none";
+    };
+    c.appendChild(back);
+
+    c.style.display = "block";
+
+    loadDayInfo(d);
+
+  } catch (e) {
+    console.error("Błąd w openDay:", e);
+  }
+}
+
+// === 8. Експорт у DOCX ===
+document.getElementById("exportBtn").onclick = function() {
   let text = "☀️ Today Is The Day — Щоденник прогресу\n\n";
+
   data.forEach((d, i) => {
     if (d.diary) {
       const dt = new Date(startDate);
@@ -578,13 +760,18 @@ document.getElementById("exportBtn").onclick = function(){
       text += `День ${i + 1} (${dt.toLocaleDateString("uk-UA")}):\n${d.diary}\n\n`;
     }
   });
-  const blob = new Blob([text], {type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+
+  const blob = new Blob([text], {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  });
+
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "TodayIsTheDay_Щоденник.docx";
   a.click();
 };
 
+// === 9. Старт ===
 updateProgress();
 showCalendar(todayIndex);
 openDay(todayIndex);
