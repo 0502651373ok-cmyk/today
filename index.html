@@ -176,8 +176,12 @@ label {
   margin: 4px 0;
 }
 
-button.back {
-  margin-top: 15px;
+button.back,
+button.export,
+button.meds-btn,
+button.modal-btn,
+button.modal-close,
+button.delete-plan-btn {
   background: #8bc34a;
   color: white;
   border: none;
@@ -188,13 +192,28 @@ button.back {
 
 button.export {
   background: #689f38;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 15px;
-  cursor: pointer;
-  margin: 10px auto 0;
-  display: inline-block;
+}
+
+button.meds-btn {
+  background: #558b2f;
+}
+
+button.delete-plan-btn {
+  background: #c62828;
+  padding: 6px 10px;
+  font-size: 0.9em;
+}
+
+button.back {
+  margin-top: 15px;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 10px;
 }
 
 textarea {
@@ -263,6 +282,140 @@ textarea {
   font-style: italic;
 }
 
+.plan-badge {
+  text-align: center;
+  color: #33691e;
+  margin: 0 0 14px 0;
+  font-size: 0.95em;
+}
+
+.plan-badge small {
+  display: block;
+  color: #666;
+  margin-top: 4px;
+}
+
+#medicineModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+#medicineModal.open {
+  display: flex;
+}
+
+.modal-box {
+  width: min(980px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.modal-box h3 {
+  margin-top: 0;
+  text-align: center;
+  color: #558b2f;
+}
+
+.modal-note {
+  background: #f1f8e9;
+  border-left: 4px solid #8bc34a;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  color: #33691e;
+}
+
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.plan-list {
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.plan-card {
+  border: 1px solid #dcdcdc;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.plan-card h4 {
+  margin: 0 0 6px 0;
+  color: #33691e;
+}
+
+.plan-card small {
+  color: #666;
+}
+
+.plan-card ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.plan-card li {
+  margin-bottom: 4px;
+}
+
+.plan-actions {
+  margin-top: 8px;
+}
+
+.plan-form {
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.plan-form label {
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.plan-form input[type="text"],
+.plan-form input[type="date"],
+.plan-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.plan-form textarea {
+  height: 90px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 1200px) {
   #appLayout {
     grid-template-columns: 1fr;
@@ -270,6 +423,12 @@ textarea {
 
   #dayInfo {
     position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .modal-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
@@ -285,13 +444,58 @@ textarea {
   <div id="mainColumn">
     <div id="calendar"></div>
     <div id="content" style="display:none"></div>
-    <button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
+
+    <div class="action-buttons">
+      <button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
+      <button class="meds-btn" id="medicineBtn">💊 Leki</button>
+    </div>
   </div>
 
   <aside id="dayInfo">
     <h3>O tym dniu</h3>
     <div id="dayInfoContent">Wybierz dzień w kalendarzu.</div>
   </aside>
+</div>
+
+<div id="medicineModal">
+  <div class="modal-box">
+    <h3>Схеми ліків і добавок</h3>
+
+    <div class="modal-note">
+      Нова схема починає діяти з вибраної дати. Попередні дні лишаються зі старою схемою.
+    </div>
+
+    <div class="modal-grid">
+      <div class="plan-list">
+        <div id="planListContent"></div>
+      </div>
+
+      <div class="plan-form">
+        <label for="planName">Назва схеми</label>
+        <input type="text" id="planName" placeholder="Наприклад: Весна 2026">
+
+        <label for="planEffectiveFrom">Діє з дати</label>
+        <input type="date" id="planEffectiveFrom">
+
+        <label for="planMorning">Ранок — ліки / добавки</label>
+        <textarea id="planMorning" placeholder="Кожен пункт з нового рядка"></textarea>
+
+        <label for="planDay">День — ліки / добавки</label>
+        <textarea id="planDay" placeholder="Кожен пункт з нового рядка"></textarea>
+
+        <label for="planEvening">Вечір — ліки / добавки</label>
+        <textarea id="planEvening" placeholder="Кожен пункт з нового рядка"></textarea>
+
+        <div class="modal-footer">
+          <button class="modal-btn" id="savePlanBtn">Зберегти нову схему</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="modal-close" id="closeMedicineModalBtn">Закрити</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -313,6 +517,35 @@ if (diffDays < 0) diffDays = 0;
 
 const todayIndex = diffDays;
 let data = JSON.parse(localStorage.getItem("trackerData")) || [];
+let currentMonth = today.getMonth();
+let currentYear = today.getFullYear();
+let currentOpenedIndex = todayIndex;
+
+// === 2. Схеми ліків ===
+function getDefaultMedicinePlans() {
+  return [
+    {
+      id: "plan_default",
+      name: "Базова схема",
+      effectiveFrom: startDate.toISOString().slice(0, 10),
+      morning: [
+        "Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max"
+      ],
+      day: [
+        "Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша"
+      ],
+      evening: [
+        "Magnesium bisglycinate, L-Tryptophan, Розторопша"
+      ]
+    }
+  ];
+}
+
+let medicinePlans = JSON.parse(localStorage.getItem("trackerMedicinePlans")) || getDefaultMedicinePlans();
+
+function saveMedicinePlans() {
+  localStorage.setItem("trackerMedicinePlans", JSON.stringify(medicinePlans));
+}
 
 function ensureDayExists(i) {
   while (data.length <= i) {
@@ -322,15 +555,36 @@ function ensureDayExists(i) {
 
 ensureDayExists(todayIndex);
 
-let currentMonth = today.getMonth();
-let currentYear = today.getFullYear();
-
-function saveData() {
-  localStorage.setItem("trackerData", JSON.stringify(data));
-  updateProgress();
+function normalizeList(text) {
+  return text
+    .split("\n")
+    .map(x => x.trim())
+    .filter(Boolean);
 }
 
-// === 2. Фрази дня ===
+function parseYMDToDate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+function getMedicinePlanForDate(dateObj) {
+  const target = new Date(dateObj);
+  target.setHours(0,0,0,0);
+
+  const sorted = [...medicinePlans].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  let active = sorted[0] || null;
+
+  sorted.forEach(plan => {
+    const planDate = parseYMDToDate(plan.effectiveFrom);
+    if (planDate <= target) active = plan;
+  });
+
+  return active;
+}
+
+// === 3. Фрази дня ===
 const quotes = [
   "Nie zatrzymuj się – nawet jeśli dziś boli.",
   "Jeszcze nic nie jest skończone.",
@@ -347,7 +601,7 @@ const quotes = [
 document.getElementById("quote").innerText =
   quotes[Math.floor(Math.random() * quotes.length)];
 
-// === 3. Польські дати ===
+// === 4. Польські дати ===
 const polishSpecialDays = {
   "01-01": ["Nowy Rok"],
   "01-06": ["Święto Trzech Króli"],
@@ -374,7 +628,7 @@ const polishSpecialDays = {
   "12-31": ["Sylwester"]
 };
 
-// === 4. Прогрес-бар ===
+// === 5. Прогрес-бар ===
 function updateProgress() {
   let total = 0;
   let done = 0;
@@ -389,6 +643,11 @@ function updateProgress() {
   const percent = total ? Math.round(done / total * 100) : 0;
   document.getElementById("progressFill").style.width = percent + "%";
   document.getElementById("progressText").innerText = "Виконано: " + percent + "%";
+}
+
+function saveData() {
+  localStorage.setItem("trackerData", JSON.stringify(data));
+  updateProgress();
 }
 
 function capitalizeFirst(str) {
@@ -413,7 +672,75 @@ function refreshDayButtonState(i) {
   btn.classList.add("active-day");
 }
 
-// === 5. Календар ===
+// === 6. Побудова розкладу дня ===
+function getCosmeticsForWeekday(weekday) {
+  const cosmetics = [
+    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
+    {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
+    {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
+  ];
+  return cosmetics[weekday];
+}
+
+function buildScheduleForDate(dayIndex, weekday, dateObj) {
+  const plan = getMedicinePlanForDate(dateObj);
+  const dcos = getCosmeticsForWeekday(weekday);
+  const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
+  const dayCleaning = cleaningSchedule[weekday];
+  const workout = dayIndex % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
+
+  const schedule = {
+    РАНОК: [
+      "☕ Кава з молоком",
+      ...(plan?.morning || []),
+      "Зарядка для шиї 20 хв + Ляпко 20 хв",
+      ...dcos.morning
+    ],
+    ДЕНЬ: [
+      workout,
+      ...(plan?.day || []),
+      ...dcos.day
+    ],
+    ВЕЧІР: [
+      ...(plan?.evening || []),
+      "Розтяжка + дихальні вправи",
+      ...dcos.evening
+    ]
+  };
+
+  return {
+    schedule,
+    dayCleaning,
+    plan
+  };
+}
+
+function syncTasksForCurrentSchedule(i, schedule, dayCleaning) {
+  const allowedKeys = new Set();
+
+  Object.entries(schedule).forEach(([title, items]) => {
+    items.forEach(txt => {
+      allowedKeys.add(title + "_" + txt);
+    });
+  });
+
+  allowedKeys.add("ПРИБИРАННЯ_" + dayCleaning);
+
+  const existingTasks = data[i].tasks || {};
+  const newTasks = {};
+
+  [...allowedKeys].forEach(key => {
+    newTasks[key] = existingTasks[key] ?? false;
+  });
+
+  data[i].tasks = newTasks;
+}
+
+// === 7. Календар ===
 function showCalendar(selectedIndex = null) {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
@@ -512,7 +839,7 @@ function showCalendar(selectedIndex = null) {
   cal.appendChild(grid);
 }
 
-// === 6. Блок справа ===
+// === 8. Блок справа ===
 async function loadDayInfo(dateObj) {
   const box = document.getElementById("dayInfoContent");
   if (!box) return;
@@ -557,10 +884,13 @@ async function loadDayInfo(dateObj) {
   }
 
   try {
-    const historyRes = await fetch(`https://pl.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`);
+    const historyRes = await fetch(`https://byabbe.se/on-this-day/${month}/${day}/events.json`);
     if (historyRes.ok) {
       const historyData = await historyRes.json();
-      historyEvents = (historyData.events || []).slice(0, 5);
+      historyEvents = (historyData.events || []).slice(0, 5).map(ev => ({
+        year: ev.year,
+        text: ev.description
+      }));
     }
   } catch (e) {
     console.error("Błąd pobierania wydarzeń historycznych:", e);
@@ -617,9 +947,10 @@ async function loadDayInfo(dateObj) {
   box.innerHTML = html;
 }
 
-// === 7. Відкриття дня ===
+// === 9. Відкриття дня ===
 function openDay(i) {
   try {
+    currentOpenedIndex = i;
     ensureDayExists(i);
 
     const c = document.getElementById("content");
@@ -631,44 +962,18 @@ function openDay(i) {
     const weekDays = ["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
     const dayName = weekDays[weekday];
 
+    const { schedule, dayCleaning, plan } = buildScheduleForDate(i, weekday, d);
+    syncTasksForCurrentSchedule(i, schedule, dayCleaning);
+
     const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
     c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
 
+    const badge = document.createElement("div");
+    badge.className = "plan-badge";
+    badge.innerHTML = `Схема ліків: ${plan ? plan.name : "—"}<small>Діє з ${plan ? plan.effectiveFrom : "—"}</small>`;
+    c.appendChild(badge);
+
     refreshDayButtonState(i);
-
-    const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
-    const dayCleaning = cleaningSchedule[weekday];
-    const workout = i % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
-
-    const cosmetics = [
-      {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-      {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
-      {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
-      {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-      {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
-      {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
-      {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
-    ];
-    const dcos = cosmetics[weekday];
-
-    const schedule = {
-      РАНОК: [
-        "☕ Кава з молоком",
-        "Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max",
-        "Зарядка для шиї 20 хв + Ляпко 20 хв",
-        ...dcos.morning
-      ],
-      ДЕНЬ: [
-        workout,
-        "Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша",
-        ...dcos.day
-      ],
-      ВЕЧІР: [
-        "Magnesium bisglycinate, L-Tryptophan, Розторопша",
-        "Розтяжка + дихальні вправи",
-        ...dcos.evening
-      ]
-    };
 
     for (const [title, items] of Object.entries(schedule)) {
       const sec = document.createElement("section");
@@ -676,7 +981,6 @@ function openDay(i) {
 
       items.forEach(txt => {
         const key = title + "_" + txt;
-        if (data[i].tasks[key] === undefined) data[i].tasks[key] = false;
 
         const lbl = document.createElement("label");
         const chk = document.createElement("input");
@@ -700,7 +1004,6 @@ function openDay(i) {
     clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
 
     const clKey = "ПРИБИРАННЯ_" + dayCleaning;
-    if (data[i].tasks[clKey] === undefined) data[i].tasks[clKey] = false;
 
     const clLabel = document.createElement("label");
     const clCheckbox = document.createElement("input");
@@ -742,6 +1045,7 @@ function openDay(i) {
 
     c.style.display = "block";
 
+    saveData();
     loadDayInfo(d);
 
   } catch (e) {
@@ -749,7 +1053,129 @@ function openDay(i) {
   }
 }
 
-// === 8. Експорт у DOCX ===
+// === 10. Модальне вікно ліків ===
+const medicineModal = document.getElementById("medicineModal");
+const medicineBtn = document.getElementById("medicineBtn");
+const closeMedicineModalBtn = document.getElementById("closeMedicineModalBtn");
+const savePlanBtn = document.getElementById("savePlanBtn");
+
+function renderMedicinePlans() {
+  const box = document.getElementById("planListContent");
+  box.innerHTML = "";
+
+  const sorted = [...medicinePlans].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+
+  if (!sorted.length) {
+    box.innerHTML = `<div class="day-info-muted">Схем поки що немає.</div>`;
+    return;
+  }
+
+  sorted.forEach(plan => {
+    const card = document.createElement("div");
+    card.className = "plan-card";
+
+    const m = (plan.morning || []).map(x => `<li>${x}</li>`).join("");
+    const d = (plan.day || []).map(x => `<li>${x}</li>`).join("");
+    const e = (plan.evening || []).map(x => `<li>${x}</li>`).join("");
+
+    card.innerHTML = `
+      <h4>${plan.name}</h4>
+      <small>Діє з: ${plan.effectiveFrom}</small>
+      <div><strong>Ранок:</strong><ul>${m || "<li>—</li>"}</ul></div>
+      <div><strong>День:</strong><ul>${d || "<li>—</li>"}</ul></div>
+      <div><strong>Вечір:</strong><ul>${e || "<li>—</li>"}</ul></div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "plan-actions";
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "delete-plan-btn";
+    delBtn.textContent = "Видалити";
+    delBtn.onclick = () => {
+      if (medicinePlans.length <= 1) {
+        alert("Останню схему видаляти не можна.");
+        return;
+      }
+      const ok = confirm(`Видалити схему "${plan.name}"?`);
+      if (!ok) return;
+
+      medicinePlans = medicinePlans.filter(x => x.id !== plan.id);
+      saveMedicinePlans();
+      renderMedicinePlans();
+      if (typeof currentOpenedIndex === "number") {
+        openDay(currentOpenedIndex);
+      }
+    };
+
+    actions.appendChild(delBtn);
+    card.appendChild(actions);
+    box.appendChild(card);
+  });
+}
+
+function openMedicineModal() {
+  const selectedDate = new Date(startDate);
+  selectedDate.setDate(startDate.getDate() + currentOpenedIndex);
+  document.getElementById("planEffectiveFrom").value = selectedDate.toISOString().slice(0, 10);
+  document.getElementById("planName").value = "";
+  document.getElementById("planMorning").value = "";
+  document.getElementById("planDay").value = "";
+  document.getElementById("planEvening").value = "";
+
+  renderMedicinePlans();
+  medicineModal.classList.add("open");
+}
+
+function closeMedicineModal() {
+  medicineModal.classList.remove("open");
+}
+
+medicineBtn.onclick = openMedicineModal;
+closeMedicineModalBtn.onclick = closeMedicineModal;
+
+medicineModal.addEventListener("click", (e) => {
+  if (e.target === medicineModal) closeMedicineModal();
+});
+
+savePlanBtn.onclick = () => {
+  const name = document.getElementById("planName").value.trim();
+  const effectiveFrom = document.getElementById("planEffectiveFrom").value;
+  const morning = normalizeList(document.getElementById("planMorning").value);
+  const day = normalizeList(document.getElementById("planDay").value);
+  const evening = normalizeList(document.getElementById("planEvening").value);
+
+  if (!name) {
+    alert("Вкажи назву схеми.");
+    return;
+  }
+
+  if (!effectiveFrom) {
+    alert("Вкажи дату початку схеми.");
+    return;
+  }
+
+  medicinePlans.push({
+    id: "plan_" + Date.now(),
+    name,
+    effectiveFrom,
+    morning,
+    day,
+    evening
+  });
+
+  medicinePlans.sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  saveMedicinePlans();
+  renderMedicinePlans();
+  openDay(currentOpenedIndex);
+
+  document.getElementById("planName").value = "";
+  document.getElementById("planMorning").value = "";
+  document.getElementById("planDay").value = "";
+  document.getElementById("planEvening").value = "";
+};
+
+// === 11. Експорт у DOCX ===
 document.getElementById("exportBtn").onclick = function() {
   let text = "☀️ Today Is The Day — Щоденник прогресу\n\n";
 
@@ -771,7 +1197,8 @@ document.getElementById("exportBtn").onclick = function() {
   a.click();
 };
 
-// === 9. Старт ===
+// === 12. Старт ===
+saveMedicinePlans();
 updateProgress();
 showCalendar(todayIndex);
 openDay(todayIndex);
