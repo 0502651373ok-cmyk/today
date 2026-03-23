@@ -911,10 +911,6 @@ function formatDayInfoDate(dateObj) {
 function getHistoryErrorMessage(err) {
   const msg = String(err && err.message ? err.message : err || "");
 
-  if (location.protocol === "file:") {
-    return "Przeglądarka zablokowała pobieranie danych z zewnętrznego serwisu przy uruchomieniu lokalnego pliku HTML.";
-  }
-
   if (msg.includes("AbortError")) {
     return "Zewnętrzny serwis historyczny nie odpowiedział na czas.";
   }
@@ -933,12 +929,12 @@ function getHistoryErrorMessage(err) {
 // === 6. Побудова розкладу дня ===
 function getCosmeticsForWeekday(weekday) {
   const cosmetics = [
-    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ z Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
     {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
     {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
     {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["EMS-L z Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L z Dermogal A+E albo Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H z Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
     {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
   ];
   return cosmetics[weekday];
