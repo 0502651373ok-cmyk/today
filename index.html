@@ -39,6 +39,7 @@ header {
   font-size: 1.1em;
   color: #33691e;
   margin: 10px 20px 0 0;
+  min-height: 28px;
 }
 
 #progressBar {
@@ -65,7 +66,7 @@ header {
   max-width: 1500px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 20px;
   align-items: start;
   padding: 0 15px 20px;
@@ -181,7 +182,10 @@ button.export,
 button.meds-btn,
 button.modal-btn,
 button.modal-close,
-button.delete-plan-btn {
+button.delete-plan-btn,
+button.polish-btn,
+button.quote-btn,
+button.quote-delete-btn {
   background: #8bc34a;
   color: white;
   border: none;
@@ -198,10 +202,20 @@ button.meds-btn {
   background: #558b2f;
 }
 
-button.delete-plan-btn {
+button.quote-btn {
+  background: #6a1b9a;
+}
+
+button.delete-plan-btn,
+button.quote-delete-btn {
   background: #c62828;
   padding: 6px 10px;
   font-size: 0.9em;
+}
+
+button.polish-btn {
+  background: #33691e;
+  width: 100%;
 }
 
 button.back {
@@ -282,6 +296,43 @@ textarea {
   font-style: italic;
 }
 
+#polishPanel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #dfe8d0;
+}
+
+#polishPanel h3 {
+  margin: 0 0 10px 0;
+  color: #558b2f;
+  text-align: center;
+}
+
+.polish-field {
+  margin-bottom: 12px;
+}
+
+.polish-field label {
+  margin-bottom: 5px;
+  color: #33691e;
+  font-weight: bold;
+}
+
+.polish-field input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.polish-buttons {
+  display: grid;
+  gap: 8px;
+}
+
 .plan-badge {
   text-align: center;
   color: #33691e;
@@ -295,7 +346,8 @@ textarea {
   margin-top: 4px;
 }
 
-#medicineModal {
+#medicineModal,
+#quoteModal {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.45);
@@ -307,11 +359,13 @@ textarea {
   box-sizing: border-box;
 }
 
-#medicineModal.open {
+#medicineModal.open,
+#quoteModal.open {
   display: flex;
 }
 
-.modal-box {
+.modal-box,
+.quote-modal-box {
   width: min(980px, 100%);
   max-height: 90vh;
   overflow: auto;
@@ -322,7 +376,8 @@ textarea {
   text-align: left;
 }
 
-.modal-box h3 {
+.modal-box h3,
+.quote-modal-box h3 {
   margin-top: 0;
   text-align: center;
   color: #558b2f;
@@ -387,14 +442,16 @@ textarea {
   padding: 12px;
 }
 
-.plan-form label {
+.plan-form label,
+.quote-form label {
   font-weight: bold;
   margin-top: 10px;
 }
 
 .plan-form input[type="text"],
 .plan-form input[type="date"],
-.plan-form textarea {
+.plan-form textarea,
+.quote-form textarea {
   width: 100%;
   box-sizing: border-box;
   margin-top: 6px;
@@ -404,7 +461,8 @@ textarea {
   font-family: inherit;
 }
 
-.plan-form textarea {
+.plan-form textarea,
+.quote-form textarea {
   height: 90px;
 }
 
@@ -414,6 +472,34 @@ textarea {
   gap: 10px;
   margin-top: 16px;
   flex-wrap: wrap;
+}
+
+.quote-list {
+  margin-top: 16px;
+}
+
+.quote-item {
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.quote-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.quote-item-text {
+  flex: 1;
+  line-height: 1.45;
+}
+
+.quote-item small {
+  color: #666;
 }
 
 @media (max-width: 1200px) {
@@ -448,12 +534,37 @@ textarea {
     <div class="action-buttons">
       <button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
       <button class="meds-btn" id="medicineBtn">💊 Leki</button>
+      <button class="quote-btn" id="quoteManagerBtn">💬 Frazy</button>
     </div>
   </div>
 
   <aside id="dayInfo">
     <h3>O tym dniu</h3>
     <div id="dayInfoContent">Wybierz dzień w kalendarzu.</div>
+
+    <div id="polishPanel">
+      <h3>Polski</h3>
+
+      <div class="polish-field">
+        <label for="wsjpInput">Szukaj słowa</label>
+        <input id="wsjpInput" type="text" placeholder="Np. rozwój">
+      </div>
+
+      <div class="polish-buttons">
+        <button class="polish-btn" id="wsjpSearchBtn">WSJP – szukaj</button>
+        <button class="polish-btn" id="wsjpThemeBtn">WSJP – słownik tematyczny</button>
+      </div>
+
+      <div class="polish-field" style="margin-top: 14px;">
+        <label for="bablaInput">Szukaj czasownika</label>
+        <input id="bablaInput" type="text" placeholder="Np. iść">
+      </div>
+
+      <div class="polish-buttons">
+        <button class="polish-btn" id="bablaSearchBtn">bab.la – koniugacja</button>
+        <button class="polish-btn" id="bablaHomeBtn">bab.la – strona główna</button>
+      </div>
+    </div>
   </aside>
 </div>
 
@@ -494,6 +605,30 @@ textarea {
 
     <div class="modal-footer">
       <button class="modal-close" id="closeMedicineModalBtn">Закрити</button>
+    </div>
+  </div>
+</div>
+
+<div id="quoteModal">
+  <div class="quote-modal-box">
+    <h3>Фрази дня</h3>
+
+    <div class="modal-note">
+      Тут можна додавати свої цінні фрази. Вони будуть змішуватись із базовими.
+    </div>
+
+    <div class="quote-form">
+      <label for="newQuoteInput">Нова фраза</label>
+      <textarea id="newQuoteInput" placeholder="Встав сюди нову фразу польською"></textarea>
+      <div class="modal-footer">
+        <button class="modal-btn" id="saveQuoteBtn">Додати фразу</button>
+      </div>
+    </div>
+
+    <div class="quote-list" id="quoteListContent"></div>
+
+    <div class="modal-footer">
+      <button class="modal-close" id="closeQuoteModalBtn">Закрити</button>
     </div>
   </div>
 </div>
@@ -585,7 +720,7 @@ function getMedicinePlanForDate(dateObj) {
 }
 
 // === 3. Фрази дня ===
-const quotes = [
+const baseQuotes = [
   "Nie zatrzymuj się – nawet jeśli dziś boli.",
   "Jeszcze nic nie jest skończone.",
   "Żyjesz – to znaczy, możesz jeszcze zacząć.",
@@ -598,8 +733,27 @@ const quotes = [
   "Największy postęp dzieje się wtedy, gdy nikt go nie widzi."
 ];
 
-document.getElementById("quote").innerText =
-  quotes[Math.floor(Math.random() * quotes.length)];
+let customQuotes = JSON.parse(localStorage.getItem("trackerCustomQuotes")) || [];
+
+function saveCustomQuotes() {
+  localStorage.setItem("trackerCustomQuotes", JSON.stringify(customQuotes));
+}
+
+function getAllQuotes() {
+  return [...baseQuotes, ...customQuotes];
+}
+
+function renderRandomQuote() {
+  const allQuotes = getAllQuotes();
+  const box = document.getElementById("quote");
+  if (!allQuotes.length) {
+    box.innerText = "";
+    return;
+  }
+  box.innerText = allQuotes[Math.floor(Math.random() * allQuotes.length)];
+}
+
+renderRandomQuote();
 
 // === 4. Польські дати ===
 const polishSpecialDays = {
@@ -1081,9 +1235,9 @@ function renderMedicinePlans() {
     card.innerHTML = `
       <h4>${plan.name}</h4>
       <small>Діє з: ${plan.effectiveFrom}</small>
-      <div><strong>Ранок:</strong><ul>${m || "<li>—</li>"}</ul></div>
-      <div><strong>День:</strong><ul>${d || "<li>—</li>"}</ul></div>
-      <div><strong>Вечір:</strong><ul>${e || "<li>—</li>"}</ul></div>
+      <div><span>Ранок:</span><ul>${m || "<li>—</li>"}</ul></div>
+      <div><span>День:</span><ul>${d || "<li>—</li>"}</ul></div>
+      <div><span>Вечір:</span><ul>${e || "<li>—</li>"}</ul></div>
     `;
 
     const actions = document.createElement("div");
@@ -1175,7 +1329,117 @@ savePlanBtn.onclick = () => {
   document.getElementById("planEvening").value = "";
 };
 
-// === 11. Експорт у DOCX ===
+// === 11. Frazy ===
+const quoteModal = document.getElementById("quoteModal");
+const quoteManagerBtn = document.getElementById("quoteManagerBtn");
+const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
+const saveQuoteBtn = document.getElementById("saveQuoteBtn");
+
+function renderQuoteList() {
+  const box = document.getElementById("quoteListContent");
+  box.innerHTML = "";
+
+  if (!customQuotes.length) {
+    box.innerHTML = `<div class="day-info-muted">Тут поки що немає твоїх власних фраз.</div>`;
+    return;
+  }
+
+  customQuotes.forEach((quote, index) => {
+    const item = document.createElement("div");
+    item.className = "quote-item";
+
+    item.innerHTML = `
+      <div class="quote-item-top">
+        <div class="quote-item-text">${quote}</div>
+        <button class="quote-delete-btn" data-quote-index="${index}">Видалити</button>
+      </div>
+      <small>Власна фраза</small>
+    `;
+
+    box.appendChild(item);
+  });
+
+  box.querySelectorAll(".quote-delete-btn").forEach(btn => {
+    btn.onclick = () => {
+      const idx = Number(btn.dataset.quoteIndex);
+      customQuotes.splice(idx, 1);
+      saveCustomQuotes();
+      renderQuoteList();
+      renderRandomQuote();
+    };
+  });
+}
+
+function openQuoteModal() {
+  document.getElementById("newQuoteInput").value = "";
+  renderQuoteList();
+  quoteModal.classList.add("open");
+}
+
+function closeQuoteModal() {
+  quoteModal.classList.remove("open");
+}
+
+quoteManagerBtn.onclick = openQuoteModal;
+closeQuoteModalBtn.onclick = closeQuoteModal;
+
+quoteModal.addEventListener("click", (e) => {
+  if (e.target === quoteModal) closeQuoteModal();
+});
+
+saveQuoteBtn.onclick = () => {
+  const input = document.getElementById("newQuoteInput");
+  const value = input.value.trim();
+
+  if (!value) {
+    alert("Встав фразу.");
+    return;
+  }
+
+  customQuotes.push(value);
+  saveCustomQuotes();
+  renderQuoteList();
+  renderRandomQuote();
+  input.value = "";
+};
+
+// === 12. Polski ===
+function openWsjpSearch() {
+  const value = document.getElementById("wsjpInput").value.trim();
+  if (!value) return;
+  const url = `https://www.google.com/search?q=site%3Awsjp.pl+${encodeURIComponent(value)}`;
+  window.open(url, "_blank");
+}
+
+function openWsjpTheme() {
+  window.open("https://wsjp.pl/slownik_tematyczny", "_blank");
+}
+
+function openBablaSearch() {
+  const value = document.getElementById("bablaInput").value.trim();
+  if (!value) return;
+  const url = `https://pl.bab.la/koniugacja/polski/${encodeURIComponent(value.toLowerCase())}`;
+  window.open(url, "_blank");
+}
+
+function openBablaHome() {
+  window.open("https://pl.bab.la/koniugacja/polski/", "_blank");
+}
+
+document.getElementById("wsjpSearchBtn").onclick = openWsjpSearch;
+document.getElementById("wsjpThemeBtn").onclick = openWsjpTheme;
+document.getElementById("bablaSearchBtn").onclick = openBablaSearch;
+document.getElementById("bablaHomeBtn").onclick = openBablaHome;
+
+document.getElementById("wsjpInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") openWsjpSearch();
+});
+
+document.getElementById("bablaInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") openBablaSearch();
+});
+
+// === 13. Експорт у DOCX ===
 document.getElementById("exportBtn").onclick = function() {
   let text = "☀️ Today Is The Day — Щоденник прогресу\n\n";
 
@@ -1197,7 +1461,7 @@ document.getElementById("exportBtn").onclick = function() {
   a.click();
 };
 
-// === 12. Старт ===
+// === 14. Старт ===
 saveMedicinePlans();
 updateProgress();
 showCalendar(todayIndex);
