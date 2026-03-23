@@ -31,15 +31,55 @@ header {
   color: #33691e;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
+
 #calendar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
   padding: 15px;
+  max-width: 980px;
+  margin: 0 auto;
 }
+
+.calendar-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.calendar-title {
+  min-width: 220px;
+  font-size: 1.2em;
+  color: #33691e;
+  text-transform: capitalize;
+}
+
+.calendar-nav {
+  background: #8bc34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+}
+
+.calendar-weekday {
+  font-weight: bold;
+  color: #558b2f;
+  padding: 6px 0;
+}
+
+.calendar-empty {
+  height: 90px;
+}
+
 .day-btn {
-  width: 90px;
+  width: 100%;
   height: 90px;
   border: none;
   border-radius: 12px;
@@ -52,6 +92,14 @@ header {
 }
 .day-btn:hover { background: #dcedc8; }
 .day-btn.done { background: #c5e1a5; }
+.day-btn.today {
+  box-shadow: 0 0 0 2px #8bc34a inset, 0 2px 4px rgba(0,0,0,0.2);
+}
+.day-btn.outside-range {
+  opacity: 0.45;
+  cursor: default;
+}
+
 #content {
   max-width: 700px;
   margin: 20px auto;
@@ -130,26 +178,96 @@ button.export {
 <div id="calendar"></div>
 <div id="content" style="display:none"></div>
 <button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
+
 <script>
 // === 1. Початкові дані ===
-const DAYS = 30;
 if (!localStorage.getItem("trackerStartDate")) {
   const now = new Date();
   now.setHours(0,0,0,0);
   localStorage.setItem("trackerStartDate", now.toISOString());
 }
+
 const startDate = new Date(localStorage.getItem("trackerStartDate"));
+startDate.setHours(0,0,0,0);
+
 const today = new Date();
 today.setHours(0,0,0,0);
-const diffDays = Math.floor((today - startDate) / (1000*60*60*24));
-const todayIndex = Math.min(diffDays, DAYS-1);
 
-let data = JSON.parse(localStorage.getItem("trackerData")) ||
-           Array(DAYS).fill(null).map(()=>({tasks:{}, diary:""}));
+let diffDays = Math.floor((today - startDate) / (1000*60*60*24));
+if (diffDays < 0) diffDays = 0;
 
-function saveData(){
+const todayIndex = diffDays;
+
+let data = JSON.parse(localStorage.getItem("trackerData")) || [];
+
+function ensureDayExists(i){
+  while (data.length <= i) {
+    data.push({tasks:{}, diary:""});
+  }
+}
+
+ensureDayExists(todayIndex);
+
+let currentMonth = today.getMonth();
+let currentYear = today.getFullYear();
+
+async function saveData(){
   localStorage.setItem("trackerData", JSON.stringify(data));
   updateProgress();
+
+  const token = "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";
+  const gistIdKey = "todayIsTheDayGistId";
+  let gistId = localStorage.getItem(gistIdKey);
+
+  const gistContent = JSON.stringify({
+    startDate: localStorage.getItem("trackerStartDate"),
+    data: data
+  }, null, 2);
+
+  const payload = {
+    description: "☀️ Today Is The Day — повний щоденник прогресу",
+    public: false,
+    files: {
+      "month_log.json": { content: gistContent }
+    }
+  };
+
+  try {
+    let res;
+    if (gistId) {
+      res = await fetch(`https://api.github.com/gists/${gistId}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Accept": "application/vnd.github.v3+json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await fetch("https://api.github.com/gists", {
+        method: "POST",
+        headers: {
+          "Authorization": `token ${token}`,
+          "Accept": "application/vnd.github.v3+json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    const json = await res.json();
+
+    if (!gistId && json.id) {
+      localStorage.setItem(gistIdKey, json.id);
+      console.log("🆕 Створено новий Gist:", json.html_url);
+    } else {
+      console.log("✅ Оновлено Gist:", json.html_url);
+    }
+
+  } catch (e) {
+    console.error("❌ Помилка при збереженні у Gist:", e);
+  }
 }
 
 // === 2. Фрази дня ===
@@ -170,53 +288,147 @@ document.getElementById("quote").innerText =
 
 // === 3. Прогрес-бар ===
 function updateProgress(){
-  let total=0, done=0;
-  data.forEach(day=>{
-    for(const t in day.tasks){ total++; if(day.tasks[t]) done++; }
+  let total = 0, done = 0;
+  data.forEach(day => {
+    for (const t in day.tasks) {
+      total++;
+      if (day.tasks[t]) done++;
+    }
   });
-  const percent = total?Math.round(done/total*100):0;
-  document.getElementById("progressFill").style.width = percent+"%";
-  document.getElementById("progressText").innerText = "Виконано: "+percent+"%";
+  const percent = total ? Math.round(done / total * 100) : 0;
+  document.getElementById("progressFill").style.width = percent + "%";
+  document.getElementById("progressText").innerText = "Виконано: " + percent + "%";
 }
 
 // === 4. Календар ===
-function showCalendar(){
-  const cal=document.getElementById("calendar");
-  cal.innerHTML="";
-  document.getElementById("content").style.display="none";
-  const start=new Date(startDate);
-  for(let i=0;i<DAYS;i++){
-    const d=new Date(start); d.setDate(start.getDate()+i);
-    const label = `${d.getDate()} ${d.toLocaleString("uk-UA",{month:"short"})}\n(${d.toLocaleString("uk-UA",{weekday:"short"})})`;
-    const btn=document.createElement("button");
-    btn.className="day-btn"+(Object.values(data[i].tasks).every(Boolean)&&Object.keys(data[i].tasks).length?" done":"");
-    btn.innerText=label;
-    btn.onclick=()=>openDay(i);
-    cal.appendChild(btn);
+function showCalendar(selectedIndex = null){
+  const cal = document.getElementById("calendar");
+  cal.innerHTML = "";
+  document.getElementById("content").style.display = "none";
+
+  const header = document.createElement("div");
+  header.className = "calendar-header";
+
+  const prevBtn = document.createElement("button");
+  prevBtn.className = "calendar-nav";
+  prevBtn.textContent = "←";
+  prevBtn.onclick = () => {
+    currentMonth--;
+    if (currentMonth < 0) {
+      currentMonth = 11;
+      currentYear--;
+    }
+    showCalendar(selectedIndex);
+  };
+
+  const title = document.createElement("div");
+  title.className = "calendar-title";
+  title.textContent = new Date(currentYear, currentMonth, 1)
+    .toLocaleDateString("uk-UA", {month: "long", year: "numeric"});
+
+  const nextBtn = document.createElement("button");
+  nextBtn.className = "calendar-nav";
+  nextBtn.textContent = "→";
+  nextBtn.onclick = () => {
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+    showCalendar(selectedIndex);
+  };
+
+  header.append(prevBtn, title, nextBtn);
+  cal.appendChild(header);
+
+  const grid = document.createElement("div");
+  grid.className = "calendar-grid";
+
+  const weekDays = ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
+  weekDays.forEach(dayName => {
+    const wd = document.createElement("div");
+    wd.className = "calendar-weekday";
+    wd.textContent = dayName;
+    grid.appendChild(wd);
+  });
+
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const firstWeekday = (firstDay.getDay() + 6) % 7;
+
+  for (let i = 0; i < firstWeekday; i++) {
+    const empty = document.createElement("div");
+    empty.className = "calendar-empty";
+    grid.appendChild(empty);
   }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const cellDate = new Date(currentYear, currentMonth, day);
+    cellDate.setHours(0,0,0,0);
+
+    const index = Math.floor((cellDate - startDate) / (1000*60*60*24));
+    const btn = document.createElement("button");
+    btn.className = "day-btn";
+
+    btn.innerText =
+      `${cellDate.getDate()} ${cellDate.toLocaleString("uk-UA",{month:"short"})}\n(${cellDate.toLocaleString("uk-UA",{weekday:"short"})})`;
+
+    if (cellDate.toDateString() === today.toDateString()) {
+      btn.classList.add("today");
+    }
+
+    if (index >= 0) {
+      ensureDayExists(index);
+      btn.dataset.dayIndex = index;
+
+      if (
+        Object.keys(data[index].tasks).length &&
+        Object.values(data[index].tasks).every(Boolean)
+      ) {
+        btn.classList.add("done");
+      }
+
+      if (selectedIndex === index) {
+        btn.classList.add("active-day");
+      }
+
+      btn.onclick = () => openDay(index);
+    } else {
+      btn.classList.add("outside-range");
+      btn.disabled = true;
+    }
+
+    grid.appendChild(btn);
+  }
+
+  cal.appendChild(grid);
 }
 
 // === 5. Відкриття дня ===
 function openDay(i){
-  const c=document.getElementById("content");
-  const d=new Date(startDate); d.setDate(startDate.getDate()+i);
-  const weekday = d.getDay()===0?6:d.getDay()-1;
-  const weekDays=["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
-  const dayName=weekDays[weekday];
-  // Форматований заголовок: день тижня, дата, номер дня
-const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
-c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
+  ensureDayExists(i);
 
-// Підсвічуємо активну кнопку дня
-document.querySelectorAll(".day-btn").forEach(btn => btn.classList.remove("active-day"));
-const allBtns = document.querySelectorAll(".day-btn");
-if (allBtns[i]) allBtns[i].classList.add("active-day");
+  const c = document.getElementById("content");
+  const d = new Date(startDate);
+  d.setDate(startDate.getDate() + i);
+  d.setHours(0,0,0,0);
 
-  const cleaningSchedule=["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
-  const dayCleaning=cleaningSchedule[weekday];
-  const workout=i%2===0?"Фітнес 40 хв":"Ходіння з палками 45 хв";
+  const weekday = d.getDay() === 0 ? 6 : d.getDay() - 1;
+  const weekDays = ["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
+  const dayName = weekDays[weekday];
 
-  const cosmetics=[
+  const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
+  c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
+
+  document.querySelectorAll(".day-btn").forEach(btn => btn.classList.remove("active-day"));
+  const activeBtn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
+  if (activeBtn) activeBtn.classList.add("active-day");
+
+  const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
+  const dayCleaning = cleaningSchedule[weekday];
+  const workout = i % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
+
+  const cosmetics = [
     {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
     {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
     {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
@@ -225,96 +437,126 @@ if (allBtns[i]) allBtns[i].classList.add("active-day");
     {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
     {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
   ];
-  const dcos=cosmetics[weekday];
+  const dcos = cosmetics[weekday];
 
-  const schedule={
-    РАНОК:["☕ Кава з молоком","Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max",
-           "Зарядка для шиї 20 хв + Ляпко 20 хв",...dcos.morning],
-    ДЕНЬ:[workout,"Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша",...dcos.day],
-    ВЕЧІР:["Magnesium bisglycinate, L-Tryptophan, Розторопша","Розтяжка + дихальні вправи",...dcos.evening]
+  const schedule = {
+    РАНОК: [
+      "☕ Кава з молоком",
+      "Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max",
+      "Зарядка для шиї 20 хв + Ляпко 20 хв",
+      ...dcos.morning
+    ],
+    ДЕНЬ: [
+      workout,
+      "Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша",
+      ...dcos.day
+    ],
+    ВЕЧІР: [
+      "Magnesium bisglycinate, L-Tryptophan, Розторопша",
+      "Розтяжка + дихальні вправи",
+      ...dcos.evening
+    ]
   };
 
-  for(const [title,items] of Object.entries(schedule)){
-    const sec=document.createElement("section");
-    sec.innerHTML="<h3>"+title+"</h3>";
-    items.forEach(txt=>{
-      const key=title+"_"+txt;
-      if(data[i].tasks[key]===undefined)data[i].tasks[key]=false;
-      const lbl=document.createElement("label");
-      const chk=document.createElement("input");
-      chk.type="checkbox";
-      chk.checked=data[i].tasks[key];
+  for (const [title, items] of Object.entries(schedule)) {
+    const sec = document.createElement("section");
+    sec.innerHTML = "<h3>" + title + "</h3>";
+
+    items.forEach(txt => {
+      const key = title + "_" + txt;
+      if (data[i].tasks[key] === undefined) data[i].tasks[key] = false;
+
+      const lbl = document.createElement("label");
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.checked = data[i].tasks[key];
       chk.onchange = () => {
-       data[i].tasks[key] = chk.checked;
-       saveData();
-       updateProgress();
-    };
+        data[i].tasks[key] = chk.checked;
+        saveData();
+        updateProgress();
+        showCalendar(i);
+        const currentActiveBtn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
+        if (currentActiveBtn) currentActiveBtn.classList.add("active-day");
+        document.getElementById("content").style.display = "block";
+      };
 
       lbl.appendChild(chk);
-      lbl.appendChild(document.createTextNode(" "+txt));
+      lbl.appendChild(document.createTextNode(" " + txt));
       sec.appendChild(lbl);
     });
+
     c.appendChild(sec);
   }
 
-  // === Прибирання ===
-const clSection = document.createElement("section");
-clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
+  const clSection = document.createElement("section");
+  clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
 
-const clKey = "ПРИБИРАННЯ_" + dayCleaning;
-if (data[i].tasks[clKey] === undefined) data[i].tasks[clKey] = false;
+  const clKey = "ПРИБИРАННЯ_" + dayCleaning;
+  if (data[i].tasks[clKey] === undefined) data[i].tasks[clKey] = false;
 
-const clLabel = document.createElement("label");
-const clCheckbox = document.createElement("input");
-clCheckbox.type = "checkbox";
-clCheckbox.checked = data[i].tasks[clKey];
-clCheckbox.onchange = () => {
-  data[i].tasks[clKey] = clCheckbox.checked;
-  saveData();
-  updateProgress();
-};
+  const clLabel = document.createElement("label");
+  const clCheckbox = document.createElement("input");
+  clCheckbox.type = "checkbox";
+  clCheckbox.checked = data[i].tasks[clKey];
+  clCheckbox.onchange = () => {
+    data[i].tasks[clKey] = clCheckbox.checked;
+    saveData();
+    updateProgress();
+    showCalendar(i);
+    const currentActiveBtn = document.querySelector(`.day-btn[data-day-index="${i}"]`);
+    if (currentActiveBtn) currentActiveBtn.classList.add("active-day");
+    document.getElementById("content").style.display = "block";
+  };
 
-clLabel.appendChild(clCheckbox);
-clLabel.appendChild(document.createTextNode(" " + dayCleaning));
-clSection.appendChild(clLabel);
-c.appendChild(clSection);
+  clLabel.appendChild(clCheckbox);
+  clLabel.appendChild(document.createTextNode(" " + dayCleaning));
+  clSection.appendChild(clLabel);
+  c.appendChild(clSection);
 
-  // Щоденник
-  const diary=document.createElement("section");
-  diary.innerHTML="<h3>ЩОДЕННИК</h3>";
-  const ta=document.createElement("textarea");
-  ta.value=data[i].diary||"";
-  ta.placeholder="Запиши, як минув день...";
-  ta.oninput=()=>{data[i].diary=ta.value;saveData();};
+  const diary = document.createElement("section");
+  diary.innerHTML = "<h3>ЩОДЕННИК</h3>";
+  const ta = document.createElement("textarea");
+  ta.value = data[i].diary || "";
+  ta.placeholder = "Запиши, як минув день...";
+  ta.oninput = () => {
+    data[i].diary = ta.value;
+    saveData();
+  };
   diary.appendChild(ta);
   c.appendChild(diary);
 
-  const back=document.createElement("button");
-  back.className="back";
-  back.innerText="← Назад до календаря";
-  back.onclick=showCalendar;
+  const back = document.createElement("button");
+  back.className = "back";
+  back.innerText = "← Назад до календаря";
+  back.onclick = () => {
+    currentMonth = d.getMonth();
+    currentYear = d.getFullYear();
+    showCalendar(i);
+  };
   c.appendChild(back);
-  c.style.display="block";
+
+  c.style.display = "block";
 }
 
 // === 6. Експорт у DOCX ===
-document.getElementById("exportBtn").onclick=function(){
-  let text="☀️ Today Is The Day — Щоденник прогресу\n\n";
-  data.forEach((d,i)=>{
-    if(d.diary){
-      const dt=new Date(startDate); dt.setDate(startDate.getDate()+i);
-      text+=`День ${i+1} (${dt.toLocaleDateString("uk-UA")}):\n${d.diary}\n\n`;
+document.getElementById("exportBtn").onclick = function(){
+  let text = "☀️ Today Is The Day — Щоденник прогресу\n\n";
+  data.forEach((d, i) => {
+    if (d.diary) {
+      const dt = new Date(startDate);
+      dt.setDate(startDate.getDate() + i);
+      text += `День ${i + 1} (${dt.toLocaleDateString("uk-UA")}):\n${d.diary}\n\n`;
     }
   });
-  const blob=new Blob([text],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="TodayIsTheDay_Щоденник.docx";
+  const blob = new Blob([text], {type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "TodayIsTheDay_Щоденник.docx";
   a.click();
 };
 
 updateProgress();
-showCalendar();
+showCalendar(todayIndex);
 openDay(todayIndex);
 </script>
 </body>
