@@ -166,6 +166,22 @@ button.export {
   border: 2px solid #558b2f;
   transform: scale(1.05);
 }
+#appLayout {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+#dayInfo {
+  background: #fff;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  text-align: left;
+}
 </style>
 </head>
 <body>
@@ -175,9 +191,22 @@ button.export {
 <div id="progressBar"><div id="progressFill"></div></div>
 <div id="progressText"></div>
 
-<div id="calendar"></div>
-<div id="content" style="display:none"></div>
-<button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
+<div id="appLayout">
+
+  <div id="mainColumn">
+    <div id="calendar"></div>
+    <div id="content" style="display:none"></div>
+    <button class="export" id="exportBtn">
+      💾 Завантажити щоденник (.docx)
+    </button>
+  </div>
+
+  <aside id="dayInfo">
+    <h3>O tym dniu</h3>
+    <div id="dayInfoContent">Wybierz dzień w kalendarzu.</div>
+  </aside>
+
+</div>
 
 <script>
 // === 1. Початкові дані ===
@@ -410,6 +439,7 @@ function openDay(i){
 
   const c = document.getElementById("content");
   const d = new Date(startDate);
+  loadDayInfo(d);
   d.setDate(startDate.getDate() + i);
   d.setHours(0,0,0,0);
 
