@@ -1407,7 +1407,7 @@ saveQuoteBtn.onclick = () => {
 function openWsjpSearch() {
   const value = document.getElementById("wsjpInput").value.trim();
   if (!value) return;
-  const url = `https://www.google.com/search?q=site%3Awsjp.pl+${encodeURIComponent(value)}`;
+  const url = `https://wsjp.pl/szukaj/podstawowe/wyniki?szukaj=${encodeURIComponent(value)}`;
   window.open(url, "_blank");
 }
 
