@@ -33,13 +33,64 @@ header {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
+#topMetaRow {
+  width: min(90%, 1400px);
+  margin: 10px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
+  gap: 14px;
+  align-items: stretch;
+}
+
 .quote {
   text-align: right;
   font-style: italic;
   font-size: 1.1em;
   color: #33691e;
-  margin: 10px 20px 0 0;
   min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 8px 0;
+}
+
+#topWeatherStrip {
+  background: rgba(255,255,255,0.88);
+  border: 1px solid #dfe8d0;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  padding: 10px 14px;
+  text-align: left;
+  color: #33691e;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.top-weather-loading,
+.top-weather-muted {
+  color: #5f6f52;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+
+.top-weather-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  font-size: 0.96em;
+  line-height: 1.35;
+}
+
+.top-weather-city {
+  font-weight: bold;
+  color: #2f5d19;
+}
+
+.top-weather-sep {
+  color: #94a38b;
 }
 
 #progressBar {
@@ -305,7 +356,8 @@ textarea {
   font-size: 0.93em;
 }
 
-.history-card {
+.history-card,
+.weather-card {
   margin-bottom: 10px;
   padding: 10px 12px;
   border: 1px solid #e3e3e3;
@@ -318,10 +370,47 @@ textarea {
   text-decoration: none;
   font-weight: bold;
   line-height: 1.5;
+  display: block;
 }
 
 .history-link:hover {
   text-decoration: underline;
+}
+
+.history-text {
+  color: #33691e;
+  font-weight: bold;
+  line-height: 1.5;
+}
+
+.weather-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.weather-item {
+  background: #fff;
+  border: 1px solid #edf1e7;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.weather-item-label {
+  font-size: 0.83em;
+  color: #6a765d;
+  margin-bottom: 4px;
+}
+
+.weather-item-value {
+  color: #2f5d19;
+  font-weight: bold;
+}
+
+.weather-description {
+  margin-bottom: 10px;
+  color: #2f5d19;
+  font-weight: bold;
 }
 
 #polishPanel {
@@ -540,16 +629,43 @@ textarea {
   }
 }
 
+@media (max-width: 980px) {
+  #topMetaRow {
+    grid-template-columns: 1fr;
+  }
+
+  .quote {
+    justify-content: center;
+    text-align: center;
+  }
+}
+
 @media (max-width: 900px) {
   .modal-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .weather-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-weather-main {
+    gap: 8px;
   }
 }
 </style>
 </head>
 <body>
 <header>☀️ Today Is The Day — Щоденник прогресу</header>
-<div class="quote" id="quote"></div>
+
+<div id="topMetaRow">
+  <div class="quote" id="quote"></div>
+  <div id="topWeatherStrip">
+    <div class="top-weather-loading">Pogoda w Prudniku pojawi się po wybraniu dnia.</div>
+  </div>
+</div>
 
 <div id="progressBar"><div id="progressFill"></div></div>
 <div id="progressText"></div>
@@ -895,6 +1011,13 @@ function formatDayInfoDate(dateObj) {
   }));
 }
 
+function formatYMD(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function getPolishWikiDayTitle(dateObj) {
   const months = [
     "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
@@ -915,64 +1038,92 @@ function cleanText(text) {
     .trim();
 }
 
-function extractEventsFromDayPage(html) {
-  const wrapper = document.createElement("div");
-  wrapper.innerHTML = html;
+function normalizeHeadingText(text) {
+  return cleanText(text)
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
 
-  const headlines = [...wrapper.querySelectorAll(".mw-headline")];
-  let targetHeadline = null;
+function getSectionNodesAfterHeading(headingEl) {
+  if (!headingEl) return [];
+  const sectionNodes = [];
+  const currentLevel = Number((headingEl.tagName || "").replace("H", "")) || 2;
 
-  for (const h of headlines) {
-    const id = h.getAttribute("id") || "";
-    const txt = cleanText(h.textContent || "");
-    if (id === "Wydarzenia" || txt === "Wydarzenia") {
-      targetHeadline = h;
-      break;
-    }
-  }
-
-  if (!targetHeadline) return [];
-
-  const heading = targetHeadline.closest("h2, h3");
-  if (!heading) return [];
-
-  let node = heading.nextElementSibling;
-  const events = [];
-
+  let node = headingEl.nextElementSibling;
   while (node) {
-    if (node.matches("h2")) break;
-    if (node.matches("h3")) break;
-
-    if (node.matches("ul")) {
-      const items = [...node.querySelectorAll(":scope > li")];
-
-      items.forEach(li => {
-        const text = cleanText(li.textContent || "");
-        const match = text.match(/^(\d{3,4})\s*[–—-]\s*(.+)$/);
-        if (!match) return;
-
-        const links = [...li.querySelectorAll('a[href^="/wiki/"]')].filter(a => {
-          const href = a.getAttribute("href") || "";
-          return !href.includes(":") && !href.startsWith("/wiki/Plik:") && !href.startsWith("/wiki/Kategoria:");
-        });
-
-        const firstGoodLink = links[0];
-        const link = firstGoodLink
-          ? `https://pl.wikipedia.org${firstGoodLink.getAttribute("href")}`
-          : null;
-
-        events.push({
-          year: match[1],
-          text: match[2],
-          link
-        });
-      });
+    const tag = (node.tagName || "").toUpperCase();
+    if (/^H[1-6]$/.test(tag)) {
+      const nextLevel = Number(tag.replace("H", ""));
+      if (nextLevel <= currentLevel) break;
     }
-
+    sectionNodes.push(node);
     node = node.nextElementSibling;
   }
 
+  return sectionNodes;
+}
+
+function extractSingleListItemData(li) {
+  const cloned = li.cloneNode(true);
+
+  cloned.querySelectorAll("sup, .reference, .mw-editsection, style, script").forEach(el => el.remove());
+  cloned.querySelectorAll("ul, ol, dl").forEach(el => el.remove());
+
+  const text = cleanText(cloned.textContent || "");
+  const match = text.match(/^(\d{3,4})\s*[–—-]\s*(.+)$/);
+  if (!match) return null;
+
+  const validLinks = [...li.querySelectorAll('a[href^="/wiki/"]')].filter(a => {
+    const href = a.getAttribute("href") || "";
+    if (!href.startsWith("/wiki/")) return false;
+    if (href.includes(":")) return false;
+    if (href.includes("#")) return false;
+    return true;
+  });
+
+  const firstGoodLink = validLinks[0];
+  const link = firstGoodLink ? `https://pl.wikipedia.org${firstGoodLink.getAttribute("href")}` : null;
+
+  return {
+    year: match[1],
+    text: cleanText(match[2]),
+    link
+  };
+}
+
+function extractEventsFromSpecificSection(html, preferredHeadingText) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = html;
+
+  const headings = [...wrapper.querySelectorAll("h2, h3, h4")];
+  const targetHeading = headings.find(h => {
+    const headline = h.querySelector(".mw-headline");
+    const text = normalizeHeadingText(headline ? headline.textContent : h.textContent);
+    return text === normalizeHeadingText(preferredHeadingText);
+  });
+
+  if (!targetHeading) return [];
+
+  const sectionNodes = getSectionNodesAfterHeading(targetHeading);
+  const events = [];
+
+  sectionNodes.forEach(node => {
+    if ((node.tagName || "").toUpperCase() === "UL") {
+      [...node.querySelectorAll(":scope > li")].forEach(li => {
+        const item = extractSingleListItemData(li);
+        if (item) events.push(item);
+      });
+    }
+  });
+
   return events;
+}
+
+function extractEventsFromDayPage(html) {
+  const fromPolandSection = extractEventsFromSpecificSection(html, "Wydarzenia w Polsce");
+  if (fromPolandSection.length) return fromPolandSection;
+  return extractEventsFromSpecificSection(html, "Wydarzenia");
 }
 
 function dedupeEvents(events) {
@@ -985,48 +1136,295 @@ function dedupeEvents(events) {
   });
 }
 
-function buildFallbackEvents(dateObj) {
-  const y = dateObj.getFullYear();
-  const decadeBase = Math.floor(y / 10) * 10;
+// === 5.2. Погода ===
+const WEATHER_COORDS_CACHE_KEY = "trackerPrudnikCoords";
+const WEATHER_ARCHIVE_PREFIX = "trackerWeatherArchive_";
 
-  return [
-    {
-      year: `${decadeBase - 300}`,
-      text: `W dawnych kronikach i kalendariach pod tą datą odnotowywano wydarzenia polityczne, religijne i społeczne związane z ziemiami polskimi oraz Europą Środkową.`,
-      link: "https://pl.wikipedia.org/wiki/Historia_Polski"
-    },
-    {
-      year: `${decadeBase - 200}`,
-      text: `Na przestrzeni kolejnych stuleci ten dzień pojawiał się w źródłach jako data decyzji władców, sejmów, bitew, reform oraz wydarzeń kościelnych mających znaczenie dla Polski.`,
-      link: "https://pl.wikipedia.org/wiki/Kalendarium_historii_Polski"
-    },
-    {
-      year: `${decadeBase - 100}`,
-      text: `W nowożytnej historii Polski podobne daty wiążą się z życiem publicznym, kulturą, wojskowością i przemianami ustrojowymi, które później opisywano w kronikach i encyklopediach.`,
-      link: "https://pl.wikipedia.org/wiki/Dzieje_Polski"
-    },
-    {
-      year: `${decadeBase - 50}`,
-      text: `W XIX i XX wieku dzień ten mógł przypadać na ważne wydarzenia społeczne, patriotyczne, naukowe lub kulturalne opisywane szerzej w polskiej historiografii.`,
-      link: "https://pl.wikipedia.org/wiki/Historia_Polski_(1918%E2%80%931939)"
-    },
-    {
-      year: `${decadeBase - 10}`,
-      text: `W najnowszej historii podobne daty często łączą się z decyzjami państwowymi, rocznicami, wydarzeniami medialnymi oraz bieżącym życiem społecznym w Polsce.`,
-      link: "https://pl.wikipedia.org/wiki/Historia_Polski_(po_1989)"
-    }
-  ];
+function weatherArchiveKey(dateKey) {
+  return `${WEATHER_ARCHIVE_PREFIX}${dateKey}`;
+}
+
+function getStoredWeatherRecord(dateKey) {
+  const raw = localStorage.getItem(weatherArchiveKey(dateKey));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveWeatherRecord(dateKey, record) {
+  if (getStoredWeatherRecord(dateKey)) return;
+  localStorage.setItem(weatherArchiveKey(dateKey), JSON.stringify(record));
+}
+
+async function getPrudnikCoords() {
+  const cached = localStorage.getItem(WEATHER_COORDS_CACHE_KEY);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (typeof parsed?.latitude === "number" && typeof parsed?.longitude === "number") {
+        return parsed;
+      }
+    } catch {}
+  }
+
+  const url = "https://geocoding-api.open-meteo.com/v1/search?name=Prudnik&country=PL&language=pl&count=10&format=json";
+  const json = await fetchJsonWithTimeout(url, 9000);
+  const results = Array.isArray(json?.results) ? json.results : [];
+  const match = results.find(item =>
+    String(item?.name || "").toLowerCase() === "prudnik" &&
+    String(item?.country_code || "").toUpperCase() === "PL"
+  ) || results[0];
+
+  if (!match) {
+    throw new Error("Nie znaleziono lokalizacji Prudnik");
+  }
+
+  const coords = {
+    latitude: Number(match.latitude),
+    longitude: Number(match.longitude),
+    name: match.name || "Prudnik",
+    country: match.country || "Polska"
+  };
+
+  localStorage.setItem(WEATHER_COORDS_CACHE_KEY, JSON.stringify(coords));
+  return coords;
+}
+
+function formatPolishTime(isoString) {
+  if (!isoString) return "Brak danych";
+  const dt = new Date(isoString);
+  if (Number.isNaN(dt.getTime())) return "Brak danych";
+  return dt.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatNumberValue(value, suffix = "", digits = 0) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "Brak danych";
+  const num = Number(value);
+  return `${num.toFixed(digits)}${suffix}`;
+}
+
+function describeCloudCover(percent) {
+  const value = Number(percent);
+  if (Number.isNaN(value)) return "Brak danych";
+  if (value <= 10) return `bezchmurnie (${value}%)`;
+  if (value <= 30) return `małe zachmurzenie (${value}%)`;
+  if (value <= 60) return `umiarkowane zachmurzenie (${value}%)`;
+  if (value <= 85) return `duże zachmurzenie (${value}%)`;
+  return `całkowite zachmurzenie (${value}%)`;
+}
+
+function getWeatherCodeDescription(code) {
+  const map = {
+    0: "Bezchmurnie",
+    1: "Przeważnie pogodnie",
+    2: "Częściowe zachmurzenie",
+    3: "Pochmurno",
+    45: "Mgła",
+    48: "Mgła osadzająca szadź",
+    51: "Słaba mżawka",
+    53: "Umiarkowana mżawka",
+    55: "Silna mżawka",
+    56: "Słaba marznąca mżawka",
+    57: "Silna marznąca mżawka",
+    61: "Słaby deszcz",
+    63: "Umiarkowany deszcz",
+    65: "Silny deszcz",
+    66: "Słaby marznący deszcz",
+    67: "Silny marznący deszcz",
+    71: "Słabe opady śniegu",
+    73: "Umiarkowane opady śniegu",
+    75: "Silne opady śniegu",
+    77: "Ziarnisty śnieg",
+    80: "Słabe przelotne opady deszczu",
+    81: "Umiarkowane przelotne opady deszczu",
+    82: "Gwałtowne przelotne opady deszczu",
+    85: "Słabe przelotne opady śniegu",
+    86: "Silne przelotne opady śniegu",
+    95: "Burza",
+    96: "Burza z lekkim gradem",
+    99: "Burza z silnym gradem"
+  };
+  return map[code] || "Brak opisu";
+}
+
+async function fetchTodayWeatherForPrudnik() {
+  const coords = await getPrudnikCoords();
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&current=temperature_2m,apparent_temperature,cloud_cover,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code&daily=sunrise,sunset&timezone=Europe%2FWarsaw&forecast_days=1`;
+  const json = await fetchJsonWithTimeout(url, 9000);
+
+  const current = json?.current || {};
+  const daily = json?.daily || {};
+
+  return {
+    city: "Prudnik",
+    country: "Polska",
+    date: formatYMD(today),
+    fetchedAt: new Date().toISOString(),
+    temperature: current.temperature_2m ?? null,
+    apparentTemperature: current.apparent_temperature ?? null,
+    cloudCover: current.cloud_cover ?? null,
+    precipitation: current.precipitation ?? null,
+    humidity: current.relative_humidity_2m ?? null,
+    pressure: current.pressure_msl ?? null,
+    wind: current.wind_speed_10m ?? null,
+    sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
+    sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
+    weatherCode: current.weather_code ?? null,
+    description: getWeatherCodeDescription(current.weather_code)
+  };
+}
+
+async function resolveWeatherForDate(dateObj) {
+  const dateKey = formatYMD(dateObj);
+  const stored = getStoredWeatherRecord(dateKey);
+  if (stored) {
+    return {
+      status: "stored",
+      data: stored
+    };
+  }
+
+  const selectedTime = dateObj.getTime();
+  const todayTime = today.getTime();
+
+  if (selectedTime < todayTime) {
+    return {
+      status: "missing-archive",
+      data: null,
+      message: "Archiwalna pogoda nie została zapisana dla tego dnia."
+    };
+  }
+
+  if (selectedTime > todayTime) {
+    return {
+      status: "future",
+      data: null,
+      message: "Pogoda dla przyszłej daty nie została jeszcze zapisana."
+    };
+  }
+
+  try {
+    const fetched = await fetchTodayWeatherForPrudnik();
+    saveWeatherRecord(dateKey, fetched);
+    const saved = getStoredWeatherRecord(dateKey) || fetched;
+
+    return {
+      status: "fetched",
+      data: saved
+    };
+  } catch {
+    return {
+      status: "unavailable",
+      data: null,
+      message: "Nie udało się teraz pobrać pogody dla Prudnika."
+    };
+  }
+}
+
+function renderWeatherCardContent(weatherState) {
+  if (!weatherState || !weatherState.data) {
+    const msg = weatherState?.message || "Brak zapisanej pogody dla tej daty.";
+    return `<div class="day-info-muted">${escapeHtml(msg)}</div>`;
+  }
+
+  const w = weatherState.data;
+
+  return `
+    <div class="weather-card">
+      <div class="weather-description">${escapeHtml(w.description || "Brak opisu")}</div>
+
+      <div class="weather-grid">
+        <div class="weather-item">
+          <div class="weather-item-label">Temperatura</div>
+          <div class="weather-item-value">${escapeHtml(formatNumberValue(w.temperature, "°C", 1))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Odczuwalna temperatura</div>
+          <div class="weather-item-value">${escapeHtml(formatNumberValue(w.apparentTemperature, "°C", 1))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Zachmurzenie</div>
+          <div class="weather-item-value">${escapeHtml(describeCloudCover(w.cloudCover))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Opady</div>
+          <div class="weather-item-value">${escapeHtml(formatNumberValue(w.precipitation, " mm", 1))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Wilgotność</div>
+          <div class="weather-item-value">${escapeHtml(formatNumberValue(w.humidity, "%"))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Ciśnienie</div>
+          <div class="weather-item-value">${escapeHtml(formatNumberValue(w.pressure, " hPa"))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Wiatr</div>
+          <div class="weather-item-value">${escapeHtml(formatNumberValue(w.wind, " km/h", 1))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Wschód słońca</div>
+          <div class="weather-item-value">${escapeHtml(formatPolishTime(w.sunrise))}</div>
+        </div>
+
+        <div class="weather-item">
+          <div class="weather-item-label">Zachód słońca</div>
+          <div class="weather-item-value">${escapeHtml(formatPolishTime(w.sunset))}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTopWeatherStrip(weatherState) {
+  const box = document.getElementById("topWeatherStrip");
+  if (!box) return;
+
+  if (!weatherState || !weatherState.data) {
+    const msg = weatherState?.message || "Pogoda w Prudniku nie jest dostępna dla tej daty.";
+    box.innerHTML = `<div class="top-weather-muted">${escapeHtml(msg)}</div>`;
+    return;
+  }
+
+  const w = weatherState.data;
+  box.innerHTML = `
+    <div class="top-weather-main">
+      <span class="top-weather-city">Pogoda w Prudniku</span>
+      <span class="top-weather-sep">•</span>
+      <span>${escapeHtml(w.description || "Brak opisu")}</span>
+      <span class="top-weather-sep">•</span>
+      <span>${escapeHtml(formatNumberValue(w.temperature, "°C", 1))}</span>
+      <span class="top-weather-sep">•</span>
+      <span>odczuwalna: ${escapeHtml(formatNumberValue(w.apparentTemperature, "°C", 1))}</span>
+      <span class="top-weather-sep">•</span>
+      <span>wiatr: ${escapeHtml(formatNumberValue(w.wind, " km/h", 1))}</span>
+      <span class="top-weather-sep">•</span>
+      <span>wschód: ${escapeHtml(formatPolishTime(w.sunrise))}</span>
+      <span class="top-weather-sep">•</span>
+      <span>zachód: ${escapeHtml(formatPolishTime(w.sunset))}</span>
+    </div>
+  `;
 }
 
 // === 6. Побудова розкладу дня ===
 function getCosmeticsForWeekday(weekday) {
   const cosmetics = [
-    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ з Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
+    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ z Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
     {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
     {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
     {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["EMS-L з Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L з Dermogal A+E або Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H з Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["EMS-L z Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L z Dermogal A+E lub Retinol Collagen Complex","Після D-Пантенол"]},
+    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H z Retinol Collagen Complex","Після D-Пантенол"]},
     {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
   ];
   return cosmetics[weekday];
@@ -1191,91 +1589,95 @@ async function loadDayInfo(dateObj) {
   if (!box) return;
 
   const requestId = ++currentDayInfoRequestId;
-
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  const md = `${month}-${day}`;
-
-  const specialDays = polishSpecialDays[md] || [];
+  const dateKey = formatYMD(dateObj);
 
   box.innerHTML = `
-    <div class="day-info-date">${formatDayInfoDate(dateObj)}</div>
+    <div class="day-info-date">${escapeHtml(formatDayInfoDate(dateObj))}</div>
+
     <div class="day-info-block">
       <h4>Polska</h4>
       <div class="day-info-muted">Ładowanie informacji...</div>
     </div>
+
     <div class="day-info-block">
       <h4>Wydarzenia historyczne</h4>
       <div class="day-info-muted">Ładowanie informacji...</div>
     </div>
+
+    <div class="day-info-block">
+      <h4>Pogoda w Prudniku</h4>
+      <div class="day-info-muted">Ładowanie informacji...</div>
+    </div>
   `;
 
-  let holidays = [];
-  let historyEvents = [];
+  renderTopWeatherStrip({
+    status: "loading",
+    data: null,
+    message: "Ładowanie pogody dla wybranego dnia..."
+  });
 
-  try {
-    const holidayData = await fetchJsonWithTimeout(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`, 7000);
-    holidays = Array.isArray(holidayData)
-      ? holidayData.filter(h => h.date === `${year}-${month}-${day}`)
-      : [];
-  } catch (e) {
-    console.error("Błąd pobierania świąt:", e);
-  }
+  const holidaysPromise = (async () => {
+    try {
+      const year = dateObj.getFullYear();
+      const holidayData = await fetchJsonWithTimeout(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`, 7000);
+      const result = Array.isArray(holidayData)
+        ? holidayData.filter(h => h.date === dateKey)
+        : [];
+      return { ok: true, data: result };
+    } catch {
+      return { ok: false, data: [] };
+    }
+  })();
 
-  try {
-    const wikiTitle = getPolishWikiDayTitle(dateObj);
-    const parsed = await fetchWikiParsePage(wikiTitle);
-    const html = parsed?.parse?.text || "";
-    const extracted = extractEventsFromDayPage(html);
-    historyEvents = dedupeEvents(extracted).slice(0, 8);
-  } catch (e) {
-    console.error("Błąd pobierania wydarzeń historycznych:", e);
-  }
+  const historyPromise = (async () => {
+    try {
+      const wikiTitle = getPolishWikiDayTitle(dateObj);
+      const parsed = await fetchWikiParsePage(wikiTitle);
+      const html = parsed?.parse?.text || "";
+      const extracted = extractEventsFromDayPage(html);
+      const events = dedupeEvents(extracted).slice(0, 8);
+      return { ok: true, data: events };
+    } catch {
+      return { ok: false, data: [] };
+    }
+  })();
 
-  if (!historyEvents.length) {
-    historyEvents = buildFallbackEvents(dateObj);
-  }
+  const weatherPromise = resolveWeatherForDate(dateObj);
+
+  const [holidaysResult, historyResult, weatherState] = await Promise.all([
+    holidaysPromise,
+    historyPromise,
+    weatherPromise
+  ]);
 
   if (requestId !== currentDayInfoRequestId) return;
 
-  let html = `
-    <div class="day-info-date">${formatDayInfoDate(dateObj)}</div>
-  `;
+  renderTopWeatherStrip(weatherState);
+
+  let html = `<div class="day-info-date">${escapeHtml(formatDayInfoDate(dateObj))}</div>`;
 
   html += `<div class="day-info-block"><h4>Polska</h4>`;
-
-  if (holidays.length || specialDays.length) {
+  if (holidaysResult.ok && holidaysResult.data.length) {
     html += "<ul>";
-
-    holidays.forEach(h => {
+    holidaysResult.data.forEach(h => {
       html += `<li>${escapeHtml(h.localName || h.name || "")}</li>`;
     });
-
-    specialDays.forEach(d => {
-      const exists = holidays.some(h => h.localName === d || h.name === d);
-      if (!exists) {
-        html += `<li>${escapeHtml(d)}</li>`;
-      }
-    });
-
     html += "</ul>";
   } else {
     html += `<div class="day-info-muted">Brak oficjalnego święta państwowego ani znanej daty okolicznościowej.</div>`;
   }
-
   html += `</div>`;
 
   html += `<div class="day-info-block"><h4>Wydarzenia historyczne</h4>`;
-
-  if (historyEvents.length) {
-    historyEvents.forEach(ev => {
+  if (historyResult.data.length) {
+    historyResult.data.forEach(ev => {
+      const label = `${ev.year}: ${ev.text}`;
       html += `
         <div class="history-card">
           ${
             ev.link
-              ? `<a class="history-link" href="${escapeHtml(ev.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(ev.year)}: ${escapeHtml(ev.text)}</a>`
-              : `<div class="history-link">${escapeHtml(ev.year)}: ${escapeHtml(ev.text)}</div>`
+              ? `<a class="history-link" href="${escapeHtml(ev.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
+              : `<div class="history-text">${escapeHtml(label)}</div>`
           }
         </div>
       `;
@@ -1283,7 +1685,10 @@ async function loadDayInfo(dateObj) {
   } else {
     html += `<div class="day-info-muted">Brak danych historycznych dla tej daty.</div>`;
   }
+  html += `</div>`;
 
+  html += `<div class="day-info-block"><h4>Pogoda w Prudniku</h4>`;
+  html += renderWeatherCardContent(weatherState);
   html += `</div>`;
 
   box.innerHTML = html;
@@ -1422,7 +1827,7 @@ function renderMedicinePlans() {
 
     card.innerHTML = `
       <h4>${escapeHtml(plan.name)}</h4>
-      <small>Діє з: ${escapeHtml(plan.effectiveFrom)}</small>
+      <small>Діє z: ${escapeHtml(plan.effectiveFrom)}</small>
       <div><span>Ранок:</span><ul>${m || "<li>—</li>"}</ul></div>
       <div><span>День:</span><ul>${d || "<li>—</li>"}</ul></div>
       <div><span>Вечір:</span><ul>${e || "<li>—</li>"}</ul></div>
