@@ -721,7 +721,7 @@ textarea {
         <label for="planName">Назва схеми</label>
         <input type="text" id="planName" placeholder="Наприклад: Весна 2026">
 
-        <label for="planEffectiveFrom">Діє з дати</label>
+        <label for="planEffectiveFrom">Діє z дати</label>
         <input type="date" id="planEffectiveFrom">
 
         <label for="planMorning">Ранок — ліки / добавки</label>
@@ -731,7 +731,7 @@ textarea {
         <textarea id="planDay" placeholder="Кожен пункт з нового рядка"></textarea>
 
         <label for="planEvening">Вечір — ліки / добавки</label>
-        <textarea id="planEvening" placeholder="Кожен пункт з нового рядка"></textarea>
+        <textarea id="planEvening" placeholder="Кожен пункт z nowego wiersza"></textarea>
 
         <div class="modal-footer">
           <button class="modal-btn" id="savePlanBtn">Зберегти нову схему</button>
@@ -1054,31 +1054,68 @@ function getSectionNodesAfterHeading(headingEl) {
   return sectionNodes;
 }
 
+function isValidWikiArticleHref(href) {
+  if (!href || !href.startsWith("/wiki/")) return false;
+  if (href.includes(":")) return false;
+  if (href.includes("#")) return false;
+  return true;
+}
+
+function isWeakGenericWikiTarget(href) {
+  if (!href) return true;
+
+  const rawTitle = href.replace(/^\/wiki\//, "");
+  const decoded = decodeURIComponent(rawTitle).replace(/_/g, " ").trim().toLowerCase();
+
+  if (/^\d{1,4}$/.test(decoded)) return true;
+  if (/^\d{1,2} [a-ząćęłńóśźż]+$/.test(decoded)) return true;
+  if (/^\d{1,2}\s+[a-ząćęłńóśźż]+$/.test(decoded)) return true;
+  if (/^\d{1,2}\s*[–-]\s*\d{1,2}\s+[a-ząćęłńóśźż]+$/.test(decoded)) return true;
+  if (/^\d+ wiek$/.test(decoded)) return true;
+  if (/^\d+_wiek$/.test(rawTitle.toLowerCase())) return true;
+  if (decoded === "polska") return true;
+  if (decoded === "europa") return true;
+  if (decoded === "świat") return true;
+  if (decoded === "stany zjednoczone") return true;
+  return false;
+}
+
+function extractBestEventLink(li) {
+  const links = [...li.querySelectorAll('a[href^="/wiki/"]')]
+    .map(a => ({
+      href: a.getAttribute("href") || "",
+      text: cleanText(a.textContent || "")
+    }))
+    .filter(item => isValidWikiArticleHref(item.href));
+
+  if (!links.length) return null;
+
+  const strong = links.find(item => !isWeakGenericWikiTarget(item.href));
+  const chosen = strong || links.find(item => !item.href.includes("(ujednoznacznienie)")) || links[0];
+
+  return chosen ? `https://pl.wikipedia.org${chosen.href}` : null;
+}
+
 function extractSingleListItemData(li) {
   const cloned = li.cloneNode(true);
 
-  cloned.querySelectorAll("sup, .reference, .mw-editsection, style, script").forEach(el => el.remove());
+  cloned.querySelectorAll("sup, .reference, .mw-editsection, style, script, .thumb, .noprint").forEach(el => el.remove());
   cloned.querySelectorAll("ul, ol, dl").forEach(el => el.remove());
 
   const text = cleanText(cloned.textContent || "");
   const match = text.match(/^(\d{3,4})\s*[–—-]\s*(.+)$/);
+
   if (!match) return null;
 
-  const validLinks = [...li.querySelectorAll('a[href^="/wiki/"]')].filter(a => {
-    const href = a.getAttribute("href") || "";
-    if (!href.startsWith("/wiki/")) return false;
-    if (href.includes(":")) return false;
-    if (href.includes("#")) return false;
-    return true;
-  });
+  const year = match[1];
+  const description = cleanText(match[2]);
 
-  const firstGoodLink = validLinks[0];
-  const link = firstGoodLink ? `https://pl.wikipedia.org${firstGoodLink.getAttribute("href")}` : null;
+  if (!description) return null;
 
   return {
-    year: match[1],
-    text: cleanText(match[2]),
-    link
+    year,
+    text: description,
+    link: extractBestEventLink(li)
   };
 }
 
@@ -1092,42 +1129,67 @@ function dedupeEvents(events) {
   });
 }
 
-function extractEventsFromSpecificSection(html, preferredHeadingText) {
+function findMatchingHeading(wrapper, headingNames) {
+  const headings = [...wrapper.querySelectorAll("h2, h3, h4, h5")];
+  const wanted = headingNames.map(normalizeHeadingText);
+
+  return headings.find(h => {
+    const headline = h.querySelector(".mw-headline");
+    const text = normalizeHeadingText(headline ? headline.textContent : h.textContent);
+    return wanted.includes(text);
+  }) || null;
+}
+
+function extractEventsFromSpecificSection(html, headingNames) {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = html;
 
-  const headings = [...wrapper.querySelectorAll("h2, h3, h4")];
-  const wanted = normalizeHeadingText(preferredHeadingText);
-
-  const targetHeading = headings.find(h => {
-    const headline = h.querySelector(".mw-headline");
-    const text = normalizeHeadingText(headline ? headline.textContent : h.textContent);
-    return text === wanted;
-  });
-
+  const targetHeading = findMatchingHeading(wrapper, headingNames);
   if (!targetHeading) return [];
 
   const sectionNodes = getSectionNodesAfterHeading(targetHeading);
   const events = [];
 
   sectionNodes.forEach(node => {
-    if ((node.tagName || "").toUpperCase() === "UL") {
+    const tag = (node.tagName || "").toUpperCase();
+
+    if (tag === "UL" || tag === "OL") {
       [...node.querySelectorAll(":scope > li")].forEach(li => {
         const item = extractSingleListItemData(li);
         if (item) events.push(item);
       });
+      return;
     }
+
+    node.querySelectorAll?.("ul > li, ol > li").forEach(li => {
+      if (li.closest("li") !== li.parentElement.closest("li")) {
+        const item = extractSingleListItemData(li);
+        if (item) events.push(item);
+      }
+    });
   });
 
   return dedupeEvents(events);
 }
 
-function extractEventsFromDayPage(html) {
-  const polishEvents = extractEventsFromSpecificSection(html, "Wydarzenia w Polsce");
-  if (polishEvents.length) return polishEvents;
+function pickEventsCount(events) {
+  if (!Array.isArray(events) || !events.length) return [];
+  if (events.length <= 8) return events;
+  return events.slice(0, 8);
+}
 
-  const genericEvents = extractEventsFromSpecificSection(html, "Wydarzenia");
-  if (genericEvents.length) return genericEvents;
+function extractEventsFromDayPage(html) {
+  // 1) Пріоритет: Wydarzenia w Polsce
+  const polishEvents = extractEventsFromSpecificSection(html, ["Wydarzenia w Polsce"]);
+  if (polishEvents.length) return pickEventsCount(polishEvents);
+
+  // 2) Якщо нема — загальна секція Wydarzenia
+  const genericEvents = extractEventsFromSpecificSection(html, ["Wydarzenia"]);
+  if (genericEvents.length) return pickEventsCount(genericEvents);
+
+  // 3) Технічний запасний варіант для реальної структури деяких сторінок
+  const worldEvents = extractEventsFromSpecificSection(html, ["Wydarzenia na świecie"]);
+  if (worldEvents.length) return pickEventsCount(worldEvents);
 
   return [];
 }
@@ -1239,7 +1301,7 @@ function getWeatherCodeDescription(code) {
     81: "Umiarkowane przelotne opady deszczu",
     82: "Gwałtowne przelotne opady deszczu",
     85: "Słabe przelotne opady śniegu",
-    86: "Silne przelotne opady śnieгу",
+    86: "Silne przelotne opady śniegu",
     95: "Burza",
     96: "Burza z lekkim gradem",
     99: "Burza z silnym gradem"
@@ -1546,7 +1608,7 @@ function buildScheduleForDate(dayIndex, weekday, dateObj) {
   const dcos = getCosmeticsForWeekday(weekday);
   const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
   const dayCleaning = cleaningSchedule[weekday];
-  const workout = dayIndex % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
+  const workout = dayIndex % 2 === 0 ? "Фітнес 40 хв" : "Ходіння z palkami 45 хв";
 
   const schedule = {
     РАНОК: [
@@ -1752,7 +1814,8 @@ async function loadDayInfo(dateObj) {
       const extracted = extractEventsFromDayPage(html);
       const events = dedupeEvents(extracted).slice(0, 8);
       return { ok: true, data: events };
-    } catch {
+    } catch (err) {
+      console.error("Błąd pobierania wydarzeń historycznych:", err);
       return { ok: false, data: [] };
     }
   })();
@@ -2044,7 +2107,7 @@ function renderQuoteList() {
   box.innerHTML = "";
 
   if (!customQuotes.length) {
-    box.innerHTML = `<div class="day-info-muted">Тут поки що немає твоїх власних фраз.</div>`;
+    box.innerHTML = `<div class="day-info-muted">Тут поки що немає твоїх własnych fraz.</div>`;
     return;
   }
 
