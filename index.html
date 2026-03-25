@@ -868,24 +868,75 @@ textarea {
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-<script>
-// === 1. Dane początkowe ===
-if (!localStorage.getItem("trackerStartDate")) {
-  const now = new Date();
-  now.setHours(0,0,0,0);
-  localStorage.setItem("trackerStartDate", now.toISOString());
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+// =========================================================
+// FIREBASE
+// WSTAW TUTAJ SWÓJ PRAWDZIWY CONFIG Z FIREBASE CONSOLE
+// =========================================================
+const FIREBASE_CONFIG = {
+  apiKey: "WSTAW_API_KEY",
+  authDomain: "WSTAW_PROJECT.firebaseapp.com",
+  databaseURL: "https://WSTAW_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "WSTAW_PROJECT",
+  storageBucket: "WSTAW_PROJECT.firebasestorage.app",
+  messagingSenderId: "WSTAW_SENDER_ID",
+  appId: "WSTAW_APP_ID"
+};
+
+// Możesz zmienić ścieżkę na własną, ale ta sama musi być na komputerze i telefonie.
+const FIREBASE_ROOT_PATH = "today-is-the-day/shared";
+
+function isFirebaseConfigured(config) {
+  if (!config) return false;
+  const values = Object.values(config);
+  if (!values.length) return false;
+  return values.every(value => typeof value === "string" && value.trim() && !value.includes("WSTAW_"));
 }
 
-const startDate = new Date(localStorage.getItem("trackerStartDate"));
-startDate.setHours(0,0,0,0);
+const firebaseEnabled = isFirebaseConfigured(FIREBASE_CONFIG);
 
-const today = new Date();
-today.setHours(0,0,0,0);
+let firebaseApp = null;
+let firebaseDb = null;
+let remoteRootRef = null;
+let remoteListenerAttached = false;
+let isApplyingRemoteState = false;
+let remoteReady = false;
+
+if (firebaseEnabled) {
+  firebaseApp = initializeApp(FIREBASE_CONFIG);
+  firebaseDb = getDatabase(firebaseApp);
+  remoteRootRef = ref(firebaseDb, FIREBASE_ROOT_PATH);
+}
+
+// === 1. Dane początkowe ===
+function getTodayDate() {
+  const dt = new Date();
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+let today = getTodayDate();
+
+function ensureLocalStartDateExists() {
+  if (!localStorage.getItem("trackerStartDate")) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    localStorage.setItem("trackerStartDate", now.toISOString());
+  }
+}
+
+ensureLocalStartDateExists();
+
+let startDate = new Date(localStorage.getItem("trackerStartDate"));
+startDate.setHours(0, 0, 0, 0);
 
 let diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
 if (diffDays < 0) diffDays = 0;
 
-const todayIndex = diffDays;
+let todayIndex = diffDays;
 let data = JSON.parse(localStorage.getItem("trackerData")) || [];
 let currentMonth = today.getMonth();
 let currentYear = today.getFullYear();
@@ -914,47 +965,6 @@ function getDefaultMedicinePlans() {
 
 let medicinePlans = JSON.parse(localStorage.getItem("trackerMedicinePlans")) || getDefaultMedicinePlans();
 
-function saveMedicinePlans() {
-  localStorage.setItem("trackerMedicinePlans", JSON.stringify(medicinePlans));
-}
-
-function ensureDayExists(i) {
-  while (data.length <= i) {
-    data.push({ tasks: {}, diary: "" });
-  }
-}
-
-ensureDayExists(todayIndex);
-
-function normalizeList(text) {
-  return text
-    .split("\n")
-    .map(x => x.trim())
-    .filter(Boolean);
-}
-
-function parseYMDToDate(str) {
-  const [y, m, d] = str.split("-").map(Number);
-  const dt = new Date(y, m - 1, d);
-  dt.setHours(0,0,0,0);
-  return dt;
-}
-
-function getMedicinePlanForDate(dateObj) {
-  const target = new Date(dateObj);
-  target.setHours(0,0,0,0);
-
-  const sorted = [...medicinePlans].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
-  let active = sorted[0] || null;
-
-  sorted.forEach(plan => {
-    const planDate = parseYMDToDate(plan.effectiveFrom);
-    if (planDate <= target) active = plan;
-  });
-
-  return active;
-}
-
 // === 3. Cytaty dnia ===
 const baseQuotes = [
   "Nie zatrzymuj się – nawet jeśli dziś boli",
@@ -971,14 +981,6 @@ const baseQuotes = [
 
 let customQuotes = JSON.parse(localStorage.getItem("trackerCustomQuotes")) || [];
 
-function saveCustomQuotes() {
-  localStorage.setItem("trackerCustomQuotes", JSON.stringify(customQuotes));
-}
-
-function getAllQuotes() {
-  return [...baseQuotes, ...customQuotes];
-}
-
 function formatQuote(text) {
   if (!text) return "";
 
@@ -992,6 +994,10 @@ function formatQuote(text) {
   }
 
   return `«${trimmed}».`;
+}
+
+function getAllQuotes() {
+  return [...baseQuotes, ...customQuotes];
 }
 
 // === 4. Polskie daty specjalne ===
@@ -1021,7 +1027,208 @@ const polishSpecialDays = {
   "12-31": ["Sylwester"]
 };
 
-// === 5. Pasek postępu ===
+// === 5. Sync helpers ===
+const WEATHER_COORDS_CACHE_KEY = "trackerPrudnikCoords";
+const WEATHER_ARCHIVE_PREFIX = "trackerWeatherArchive_";
+
+function weatherArchiveKey(dateKey) {
+  return `${WEATHER_ARCHIVE_PREFIX}${dateKey}`;
+}
+
+function getAllWeatherArchiveFromLocalStorage() {
+  const archive = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(WEATHER_ARCHIVE_PREFIX)) {
+      archive[key] = localStorage.getItem(key);
+    }
+  }
+  return archive;
+}
+
+function writeWeatherArchiveToLocalStorage(archiveObj) {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(WEATHER_ARCHIVE_PREFIX)) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  if (!archiveObj || typeof archiveObj !== "object") return;
+
+  Object.entries(archiveObj).forEach(([key, value]) => {
+    if (key.startsWith(WEATHER_ARCHIVE_PREFIX) && typeof value === "string") {
+      localStorage.setItem(key, value);
+    }
+  });
+}
+
+function buildRemoteStateSnapshot() {
+  return {
+    trackerStartDate: localStorage.getItem("trackerStartDate"),
+    trackerData: localStorage.getItem("trackerData"),
+    trackerMedicinePlans: localStorage.getItem("trackerMedicinePlans"),
+    trackerCustomQuotes: localStorage.getItem("trackerCustomQuotes"),
+    trackerPrudnikCoords: localStorage.getItem(WEATHER_COORDS_CACHE_KEY),
+    weatherArchive: getAllWeatherArchiveFromLocalStorage(),
+    meta: {
+      updatedAt: new Date().toISOString()
+    }
+  };
+}
+
+function applyRemoteStateToLocalStorage(remoteState) {
+  if (!remoteState || typeof remoteState !== "object") return false;
+
+  if (typeof remoteState.trackerStartDate === "string") {
+    localStorage.setItem("trackerStartDate", remoteState.trackerStartDate);
+  }
+
+  if (typeof remoteState.trackerData === "string") {
+    localStorage.setItem("trackerData", remoteState.trackerData);
+  }
+
+  if (typeof remoteState.trackerMedicinePlans === "string") {
+    localStorage.setItem("trackerMedicinePlans", remoteState.trackerMedicinePlans);
+  }
+
+  if (typeof remoteState.trackerCustomQuotes === "string") {
+    localStorage.setItem("trackerCustomQuotes", remoteState.trackerCustomQuotes);
+  }
+
+  if (typeof remoteState.trackerPrudnikCoords === "string") {
+    localStorage.setItem(WEATHER_COORDS_CACHE_KEY, remoteState.trackerPrudnikCoords);
+  }
+
+  writeWeatherArchiveToLocalStorage(remoteState.weatherArchive);
+  return true;
+}
+
+function refreshStateFromLocalStorage() {
+  ensureLocalStartDateExists();
+
+  today = getTodayDate();
+
+  startDate = new Date(localStorage.getItem("trackerStartDate"));
+  startDate.setHours(0, 0, 0, 0);
+
+  diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) diffDays = 0;
+
+  todayIndex = diffDays;
+  data = JSON.parse(localStorage.getItem("trackerData")) || [];
+  medicinePlans = JSON.parse(localStorage.getItem("trackerMedicinePlans")) || getDefaultMedicinePlans();
+  customQuotes = JSON.parse(localStorage.getItem("trackerCustomQuotes")) || [];
+
+  if (typeof currentOpenedIndex !== "number" || currentOpenedIndex < 0) {
+    currentOpenedIndex = todayIndex;
+  }
+
+  if (currentOpenedIndex > todayIndex && !data[currentOpenedIndex]) {
+    currentOpenedIndex = todayIndex;
+  }
+
+  ensureDayExists(todayIndex);
+}
+
+function persistStateLocallyOnly() {
+  localStorage.setItem("trackerStartDate", startDate.toISOString());
+  localStorage.setItem("trackerData", JSON.stringify(data));
+  localStorage.setItem("trackerMedicinePlans", JSON.stringify(medicinePlans));
+  localStorage.setItem("trackerCustomQuotes", JSON.stringify(customQuotes));
+}
+
+async function pushStateToRemote() {
+  if (!firebaseEnabled || !remoteRootRef || isApplyingRemoteState) return;
+  const snapshot = buildRemoteStateSnapshot();
+  await set(remoteRootRef, snapshot);
+}
+
+async function saveAllState() {
+  persistStateLocallyOnly();
+  updateProgress();
+
+  if (firebaseEnabled) {
+    try {
+      await pushStateToRemote();
+    } catch (error) {
+      console.error("Błąd synchronizacji do Firebase:", error);
+    }
+  }
+}
+
+function saveData() {
+  saveAllState();
+}
+
+function saveMedicinePlans() {
+  saveAllState();
+}
+
+function saveCustomQuotes() {
+  saveAllState();
+}
+
+async function initSync() {
+  persistStateLocallyOnly();
+
+  if (!firebaseEnabled || !remoteRootRef) {
+    refreshStateFromLocalStorage();
+    return;
+  }
+
+  try {
+    const snap = await get(remoteRootRef);
+
+    if (snap.exists()) {
+      isApplyingRemoteState = true;
+      applyRemoteStateToLocalStorage(snap.val());
+      isApplyingRemoteState = false;
+    } else {
+      await set(remoteRootRef, buildRemoteStateSnapshot());
+    }
+
+    refreshStateFromLocalStorage();
+
+    if (!remoteListenerAttached) {
+      onValue(remoteRootRef, (snapshot) => {
+        if (!snapshot.exists()) return;
+        if (isApplyingRemoteState) return;
+
+        isApplyingRemoteState = true;
+        applyRemoteStateToLocalStorage(snapshot.val());
+        refreshStateFromLocalStorage();
+        redrawAfterRemoteSync();
+        isApplyingRemoteState = false;
+      });
+
+      remoteListenerAttached = true;
+    }
+
+    remoteReady = true;
+  } catch (error) {
+    console.error("Błąd inicjalizacji synchronizacji Firebase:", error);
+    refreshStateFromLocalStorage();
+  }
+}
+
+function redrawAfterRemoteSync() {
+  updateProgress();
+
+  if (typeof currentOpenedIndex === "number") {
+    const openedDate = new Date(startDate);
+    openedDate.setDate(startDate.getDate() + currentOpenedIndex);
+    currentMonth = openedDate.getMonth();
+    currentYear = openedDate.getFullYear();
+    showCalendar(currentOpenedIndex);
+    openDay(currentOpenedIndex);
+  } else {
+    showCalendar(todayIndex);
+    openDay(todayIndex);
+  }
+}
+
+// === 6. Pasek postępu ===
 function updateProgress() {
   let total = 0;
   let done = 0;
@@ -1036,11 +1243,6 @@ function updateProgress() {
   const percent = total ? Math.round(done / total * 100) : 0;
   document.getElementById("progressFill").style.width = percent + "%";
   document.getElementById("progressText").innerText = "Wykonano: " + percent + "%";
-}
-
-function saveData() {
-  localStorage.setItem("trackerData", JSON.stringify(data));
-  updateProgress();
 }
 
 function capitalizeFirst(str) {
@@ -1065,7 +1267,7 @@ function refreshDayButtonState(i) {
   btn.classList.add("active-day");
 }
 
-// === 5.1. Narzędzia ===
+// === 6.1. Narzędzia ===
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1264,14 +1466,7 @@ async function fetchHistoricalEventsForDate(dateObj) {
   return extractEventsFromSectionHtml(sectionHtml);
 }
 
-// === 5.2. Pogoda ===
-const WEATHER_COORDS_CACHE_KEY = "trackerPrudnikCoords";
-const WEATHER_ARCHIVE_PREFIX = "trackerWeatherArchive_";
-
-function weatherArchiveKey(dateKey) {
-  return `${WEATHER_ARCHIVE_PREFIX}${dateKey}`;
-}
-
+// === 6.2. Pogoda ===
 function getStoredWeatherRecord(dateKey) {
   const raw = localStorage.getItem(weatherArchiveKey(dateKey));
   if (!raw) return null;
@@ -1285,7 +1480,11 @@ function getStoredWeatherRecord(dateKey) {
 function saveWeatherRecord(dateKey, record) {
   const existing = getStoredWeatherRecord(dateKey);
   if (existing && existing.hourly) return;
+
   localStorage.setItem(weatherArchiveKey(dateKey), JSON.stringify(record));
+  if (firebaseEnabled && remoteReady) {
+    pushStateToRemote().catch(error => console.error("Błąd synchronizacji pogody:", error));
+  }
 }
 
 async function getPrudnikCoords() {
@@ -1319,6 +1518,9 @@ async function getPrudnikCoords() {
   };
 
   localStorage.setItem(WEATHER_COORDS_CACHE_KEY, JSON.stringify(coords));
+  if (firebaseEnabled && remoteReady) {
+    pushStateToRemote().catch(error => console.error("Błąd synchronizacji współrzędnych:", error));
+  }
   return coords;
 }
 
@@ -1372,7 +1574,7 @@ function getSeasonalHorizonDays() {
 
 function getDayDistanceFromToday(dateObj) {
   const target = new Date(dateObj);
-  target.setHours(0,0,0,0);
+  target.setHours(0, 0, 0, 0);
   return Math.floor((target - today) / (1000 * 60 * 60 * 24));
 }
 
@@ -1779,16 +1981,51 @@ function renderTopWeatherStrip(weatherState) {
   `;
 }
 
-// === 6. Budowanie planu dnia ===
+// === 7. Budowanie planu dnia ===
+function ensureDayExists(i) {
+  while (data.length <= i) {
+    data.push({ tasks: {}, diary: "" });
+  }
+}
+
+function normalizeList(text) {
+  return text
+    .split("\n")
+    .map(x => x.trim())
+    .filter(Boolean);
+}
+
+function parseYMDToDate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function getMedicinePlanForDate(dateObj) {
+  const target = new Date(dateObj);
+  target.setHours(0, 0, 0, 0);
+
+  const sorted = [...medicinePlans].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  let active = sorted[0] || null;
+
+  sorted.forEach(plan => {
+    const planDate = parseYMDToDate(plan.effectiveFrom);
+    if (planDate <= target) active = plan;
+  });
+
+  return active;
+}
+
 function getCosmeticsForWeekday(weekday) {
   const cosmetics = [
-    {morning:["Darsonval (twarz, brwi, włosy)","Jonoforeza Ion+ z Bielenda (wit. C)","Po zabiegu D-Panthenol","SPF 50+"],day:[],evening:[]},
-    {morning:["Maska Renew Anti Age","SPF 50+"],day:["Odpoczynek, nawilżenie"],evening:[]},
-    {morning:["SPF 50+"],day:[],evening:["Jonoforeza Ion− z roztworem sody","Po zabiegu Retinobaza 17000"]},
-    {morning:["Darsonval","Peeling kawitacyjny","Po zabiegu D-Panthenol","SPF 50+"],day:[],evening:[]},
-    {morning:["EMS-L z Bielenda (wit. C)","SPF 50+"],day:[],evening:["EMS-L z Dermogal A+E lub Retinol Collagen Complex","Po zabiegu D-Panthenol"]},
-    {morning:["Maska żelatynowa do włosów","Maska Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H z Retinol Collagen Complex","Po zabiegu D-Panthenol"]},
-    {morning:["Maska Renew Anti Age","Darsonval","SPF 50+"],day:[],evening:["Mezoterapia mikroigłowa (twarz + włosy)","Po zabiegu D-Panthenol"]}
+    { morning: ["Darsonval (twarz, brwi, włosy)", "Jonoforeza Ion+ z Bielenda (wit. C)", "Po zabiegu D-Panthenol", "SPF 50+"], day: [], evening: [] },
+    { morning: ["Maska Renew Anti Age", "SPF 50+"], day: ["Odpoczynek, nawilżenie"], evening: [] },
+    { morning: ["SPF 50+"], day: [], evening: ["Jonoforeza Ion− z roztworem sody", "Po zabiegu Retinobaza 17000"] },
+    { morning: ["Darsonval", "Peeling kawitacyjny", "Po zabiegu D-Panthenol", "SPF 50+"], day: [], evening: [] },
+    { morning: ["EMS-L z Bielenda (wit. C)", "SPF 50+"], day: [], evening: ["EMS-L z Dermogal A+E lub Retinol Collagen Complex", "Po zabiegu D-Panthenol"] },
+    { morning: ["Maska żelatynowa do włosów", "Maska Renew Anti Age", "SPF 50+"], day: [], evening: ["EMS-H z Retinol Collagen Complex", "Po zabiegu D-Panthenol"] },
+    { morning: ["Maska Renew Anti Age", "Darsonval", "SPF 50+"], day: [], evening: ["Mezoterapia mikroigłowa (twarz + włosy)", "Po zabiegu D-Panthenol"] }
   ];
   return cosmetics[weekday];
 }
@@ -1796,13 +2033,13 @@ function getCosmeticsForWeekday(weekday) {
 function buildScheduleForDate(dayIndex, weekday, dateObj) {
   const plan = getMedicinePlanForDate(dateObj);
   const dcos = getCosmeticsForWeekday(weekday);
-  const cleaningSchedule = ["Brak","Kuchnia","Salon","Łazienka","Balkon / korytarz","Generalne sprzątanie","Brak"];
+  const cleaningSchedule = ["Brak", "Kuchnia", "Salon", "Łazienka", "Balkon / korytarz", "Generalne sprzątanie", "Brak"];
   const dayCleaning = cleaningSchedule[weekday];
   const workout = dayIndex % 2 === 0 ? "Fitness 40 min" : "Marsz z kijkami 45 min";
 
   const schedule = {
     RANO: [
-      "☕ Kawa z mlekiem",
+      "☕ Kawa",
       ...(plan?.morning || []),
       "Ćwiczenia na szyję 20 min + Łapko 20 min",
       ...dcos.morning
@@ -1847,7 +2084,7 @@ function syncTasksForCurrentSchedule(i, schedule, dayCleaning) {
   data[i].tasks = newTasks;
 }
 
-// === 7. Kalendarz ===
+// === 8. Kalendarz ===
 function showCalendar(selectedIndex = null) {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
@@ -1889,7 +2126,7 @@ function showCalendar(selectedIndex = null) {
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
 
-  const weekDays = ["Pon","Wt","Śr","Czw","Pt","Sob","Nd"];
+  const weekDays = ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"];
   weekDays.forEach(dayName => {
     const wd = document.createElement("div");
     wd.className = "calendar-weekday";
@@ -1909,7 +2146,7 @@ function showCalendar(selectedIndex = null) {
 
   for (let day = 1; day <= daysInMonth; day++) {
     const cellDate = new Date(currentYear, currentMonth, day);
-    cellDate.setHours(0,0,0,0);
+    cellDate.setHours(0, 0, 0, 0);
 
     const index = Math.floor((cellDate - startDate) / (1000 * 60 * 60 * 24));
     const btn = document.createElement("button");
@@ -1946,7 +2183,7 @@ function showCalendar(selectedIndex = null) {
   cal.appendChild(grid);
 }
 
-// === 8. Panel po prawej ===
+// === 9. Panel po prawej ===
 async function loadDayInfo(dateObj) {
   const box = document.getElementById("dayInfoContent");
   if (!box) return;
@@ -2054,7 +2291,7 @@ async function loadDayInfo(dateObj) {
   box.innerHTML = html;
 }
 
-// === 9. Otwieranie dnia ===
+// === 10. Otwieranie dnia ===
 function openDay(i) {
   try {
     currentOpenedIndex = i;
@@ -2063,10 +2300,10 @@ function openDay(i) {
     const c = document.getElementById("content");
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    d.setHours(0,0,0,0);
+    d.setHours(0, 0, 0, 0);
 
     const weekday = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    const weekDays = ["Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota","Niedziela"];
+    const weekDays = ["Poniedziałek", "Wtorek", "Środa", "Czwartek", "Piątek", "Sobota", "Niedziela"];
     const dayName = weekDays[weekday];
 
     const { schedule, dayCleaning, plan } = buildScheduleForDate(i, weekday, d);
@@ -2169,7 +2406,7 @@ function openDay(i) {
   }
 }
 
-// === 10. Modal leków ===
+// === 11. Modal leków ===
 const medicineModal = document.getElementById("medicineModal");
 const medicineBtn = document.getElementById("medicineBtn");
 const closeMedicineModalBtn = document.getElementById("closeMedicineModalBtn");
@@ -2291,7 +2528,7 @@ savePlanBtn.onclick = () => {
   document.getElementById("planEvening").value = "";
 };
 
-// === 11. Cytaty ===
+// === 12. Cytaty ===
 const quoteModal = document.getElementById("quoteModal");
 const quoteManagerBtn = document.getElementById("quoteManagerBtn");
 const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
@@ -2365,7 +2602,7 @@ saveQuoteBtn.onclick = () => {
   input.value = "";
 };
 
-// === 12. Polski ===
+// === 13. Polski ===
 function openWsjpSearch() {
   const value = document.getElementById("wsjpInput").value.trim();
   if (!value) return;
@@ -2401,7 +2638,7 @@ document.getElementById("bablaInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") openBablaSearch();
 });
 
-// === 13. Prawdziwy eksport do DOCX ===
+// === 14. Prawdziwy eksport do DOCX ===
 async function exportDiaryToDocx() {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
 
@@ -2476,12 +2713,12 @@ async function exportDiaryToDocx() {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, "TodayIsTheDay_Dziennik.docx");
+  window.saveAs(blob, "TodayIsTheDay_Dziennik.docx");
 }
 
 document.getElementById("exportBtn").onclick = async function() {
   try {
-    if (!window.docx || typeof saveAs !== "function") {
+    if (!window.docx || typeof window.saveAs !== "function") {
       alert("Biblioteki eksportu DOCX nie zostały załadowane.");
       return;
     }
@@ -2493,11 +2730,21 @@ document.getElementById("exportBtn").onclick = async function() {
   }
 };
 
-// === 14. Start ===
-saveMedicinePlans();
-updateProgress();
-showCalendar(todayIndex);
-openDay(todayIndex);
+// === 15. Start ===
+async function startApp() {
+  ensureDayExists(todayIndex);
+  persistStateLocallyOnly();
+
+  await initSync();
+
+  ensureDayExists(todayIndex);
+  persistStateLocallyOnly();
+  updateProgress();
+  showCalendar(todayIndex);
+  openDay(todayIndex);
+}
+
+startApp();
 </script>
 </body>
 </html>
