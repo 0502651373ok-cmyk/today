@@ -877,13 +877,13 @@ import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/fir
 // WSTAW TUTAJ SWÓJ PRAWDZIWY CONFIG Z FIREBASE CONSOLE
 // =========================================================
 const FIREBASE_CONFIG = {
-  apiKey: "WSTAW_API_KEY",
-  authDomain: "WSTAW_PROJECT.firebaseapp.com",
-  databaseURL: "https://WSTAW_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "WSTAW_PROJECT",
-  storageBucket: "WSTAW_PROJECT.firebasestorage.app",
-  messagingSenderId: "WSTAW_SENDER_ID",
-  appId: "WSTAW_APP_ID"
+  apiKey: "AIzaSyDPErHQw5lGS_qlngpP1M0wcrirDowyADM",
+  authDomain: "tempo-b6986.firebaseapp.com",
+  databaseURL: "https://tempo-b6986-default-rtdb.firebaseio.com",
+  projectId: "tempo-b6986",
+  storageBucket: "tempo-b6986.firebasestorage.app",
+  messagingSenderId: "925795835844",
+  appId: "1:925795835844:web:61cb2adadef11c8ccf4e91"
 };
 
 // Możesz zmienić ścieżkę na własną, ale ta sama musi być na komputerze i telefonie.
@@ -2745,6 +2745,27 @@ async function startApp() {
 }
 
 startApp();
+</script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDPErHQw5lGS_qlngpP1M0wcrirDowyADM",
+  authDomain: "tempo-b6986.firebaseapp.com",
+  databaseURL: "https://tempo-b6986-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "tempo-b6986",
+  storageBucket: "tempo-b6986.firebasestorage.app",
+  messagingSenderId: "925795835844",
+  appId: "1:925795835844:web:61cb2adadef11c8ccf4e91"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+set(ref(db, 'test/'), {
+  value: "hello"
+});
 </script>
 </body>
 </html>
