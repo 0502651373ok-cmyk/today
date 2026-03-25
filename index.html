@@ -198,26 +198,34 @@ header {
   color: #33691e;
 }
 
-.day-quote-card {
-  margin: 0 0 16px 0;
-  padding: 12px 14px;
-  background: #faf7ff;
-  border: 1px solid #e4d8f5;
-  border-radius: 12px;
-  color: #4e2a73;
-  line-height: 1.45;
-  text-align: left;
+#rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
 }
 
-.day-quote-title {
+.day-quote-right {
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #dfe8d0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #2f5d19;
+  text-align: left;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  box-sizing: border-box;
+}
+
+.day-quote-right-title {
   font-size: 0.95em;
   font-weight: bold;
-  color: #6a1b9a;
+  color: #33691e;
   margin-bottom: 6px;
 }
 
-.day-quote-text {
+.day-quote-right-text {
   font-size: 1em;
+  line-height: 1.4;
 }
 
 #calendar {
@@ -394,6 +402,7 @@ textarea {
   position: sticky;
   top: 15px;
   min-height: 260px;
+  box-sizing: border-box;
 }
 
 #dayInfo h3 {
@@ -676,6 +685,10 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  #rightColumn {
+    margin-top: 0;
+  }
+
   #dayInfo {
     position: static;
   }
@@ -718,7 +731,7 @@ textarea {
   }
 
   .weather-explain-item,
-  .day-quote-text {
+  .day-quote-right-text {
     font-size: 0.95em;
   }
 }
@@ -750,31 +763,38 @@ textarea {
     </div>
   </div>
 
-  <aside id="dayInfo">
-    <h3>O tym dniu</h3>
-    <div id="dayInfoContent">Wybierz dzień w kalendarzu.</div>
+  <aside id="rightColumn">
+    <div class="day-quote-right">
+      <div class="day-quote-right-title">Cytat dnia</div>
+      <div class="day-quote-right-text" id="dayQuoteText"></div>
+    </div>
 
-    <div id="polishPanel">
-      <h3>Polski</h3>
+    <div id="dayInfo">
+      <h3>O tym dniu</h3>
+      <div id="dayInfoContent">Wybierz dzień w kalendarzu.</div>
 
-      <div class="polish-field">
-        <label for="wsjpInput">Szukaj słowa</label>
-        <input id="wsjpInput" type="text" placeholder="Np. rozwój">
-      </div>
+      <div id="polishPanel">
+        <h3>Polski</h3>
 
-      <div class="polish-buttons">
-        <button class="polish-btn" id="wsjpSearchBtn">WSJP – szukaj</button>
-        <button class="polish-btn" id="wsjpThemeBtn">WSJP – słownik tematyczny</button>
-      </div>
+        <div class="polish-field">
+          <label for="wsjpInput">Szukaj słowa</label>
+          <input id="wsjpInput" type="text" placeholder="Np. rozwój">
+        </div>
 
-      <div class="polish-field" style="margin-top: 14px;">
-        <label for="bablaInput">Szukaj czasownika</label>
-        <input id="bablaInput" type="text" placeholder="Np. iść">
-      </div>
+        <div class="polish-buttons">
+          <button class="polish-btn" id="wsjpSearchBtn">WSJP – szukaj</button>
+          <button class="polish-btn" id="wsjpThemeBtn">WSJP – słownik tematyczny</button>
+        </div>
 
-      <div class="polish-buttons">
-        <button class="polish-btn" id="bablaSearchBtn">bab.la – koniugacja</button>
-        <button class="polish-btn" id="bablaHomeBtn">bab.la – strona główna</button>
+        <div class="polish-field" style="margin-top: 14px;">
+          <label for="bablaInput">Szukaj czasownika</label>
+          <input id="bablaInput" type="text" placeholder="Np. iść">
+        </div>
+
+        <div class="polish-buttons">
+          <button class="polish-btn" id="bablaSearchBtn">bab.la – koniugacja</button>
+          <button class="polish-btn" id="bablaHomeBtn">bab.la – strona główna</button>
+        </div>
       </div>
     </div>
   </aside>
@@ -937,16 +957,16 @@ function getMedicinePlanForDate(dateObj) {
 
 // === 3. Cytaty dnia ===
 const baseQuotes = [
-  "Nie zatrzymuj się – nawet jeśli dziś boli.",
-  "Jeszcze nic nie jest skończone.",
-  "Żyjesz – to znaczy, możesz jeszcze zacząć.",
-  "Nawet mały krok – to też kierunek.",
-  "To, że dziś jest trudno, nie oznacza, że się cofasz.",
-  "Nie wszystko musi być idealne, żeby miało sens.",
-  "Nie musisz przyspieszać. Wystarczy, że idziesz.",
-  "Twoje tempo też jest tempem.",
-  "Stabilność to też postęp.",
-  "Największy postęp dzieje się wtedy, gdy nikt go nie widzi."
+  "Nie zatrzymuj się – nawet jeśli dziś boli",
+  "Jeszcze nic nie jest skończone",
+  "Żyjesz – to znaczy, możesz jeszcze zacząć",
+  "Nawet mały krok – to też kierunek",
+  "To, że dziś jest trudno, nie oznacza, że się cofasz",
+  "Nie wszystko musi być idealne, żeby miało sens",
+  "Nie musisz przyspieszać. Wystarczy, że idziesz",
+  "Twoje tempo też jest tempem",
+  "Stabilność to też postęp",
+  "Największy postęp dzieje się wtedy, gdy nikt go nie widzi"
 ];
 
 let customQuotes = JSON.parse(localStorage.getItem("trackerCustomQuotes")) || [];
@@ -959,10 +979,19 @@ function getAllQuotes() {
   return [...baseQuotes, ...customQuotes];
 }
 
-function getRandomQuoteText() {
-  const allQuotes = getAllQuotes();
-  if (!allQuotes.length) return "";
-  return `„${allQuotes[Math.floor(Math.random() * allQuotes.length)]}”`;
+function formatQuote(text) {
+  if (!text) return "";
+
+  const trimmed = String(text).trim();
+  const punctuationMatch = trimmed.match(/[.!?,:;…]+$/u);
+
+  if (punctuationMatch) {
+    const punctuation = punctuationMatch[0];
+    const core = trimmed.slice(0, -punctuation.length).trimEnd();
+    return `«${core}${punctuation}»`;
+  }
+
+  return `«${trimmed}».`;
 }
 
 // === 4. Polskie daty specjalne ===
@@ -1293,13 +1322,6 @@ async function getPrudnikCoords() {
   return coords;
 }
 
-function formatPolishTime(isoString) {
-  if (!isoString) return "Brak danych";
-  const dt = new Date(isoString);
-  if (Number.isNaN(dt.getTime())) return "Brak danych";
-  return dt.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
-}
-
 function formatNumberValue(value, suffix = "", digits = 0) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "Brak danych";
   const num = Number(value);
@@ -1399,11 +1421,10 @@ async function fetchForecastWeatherForDate(dateObj) {
   const coords = await getPrudnikCoords();
   const dateKey = formatYMD(dateObj);
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,pressure_msl,weather_code&daily=sunrise,sunset&timezone=Europe%2FWarsaw`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,pressure_msl,weather_code&timezone=Europe%2FWarsaw`;
 
   const json = await fetchJsonWithTimeout(url, 9000);
   const hourly = json?.hourly || {};
-  const daily = json?.daily || {};
   const times = Array.isArray(hourly.time) ? hourly.time : [];
   const idx = pickMiddayIndex(times, 12);
 
@@ -1422,8 +1443,6 @@ async function fetchForecastWeatherForDate(dateObj) {
     description: getWeatherCodeDescription(weatherCode),
     humidity: hourly.relative_humidity_2m?.[idx] ?? averageNumber(hourly.relative_humidity_2m || []),
     pressure: hourly.pressure_msl?.[idx] ?? averageNumber(hourly.pressure_msl || []),
-    sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
-    sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
     hourly: hourlyPoints
   };
 }
@@ -1432,7 +1451,7 @@ async function fetchSeasonalWeatherForDate(dateObj) {
   const coords = await getPrudnikCoords();
   const dateKey = formatYMD(dateObj);
 
-  const url = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&daily=weather_code,temperature_2m_mean,apparent_temperature_mean,relative_humidity_2m_mean,pressure_msl_mean,sunrise,sunset&timezone=Europe%2FWarsaw`;
+  const url = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&daily=weather_code,temperature_2m_mean,apparent_temperature_mean,relative_humidity_2m_mean,pressure_msl_mean&timezone=Europe%2FWarsaw`;
 
   const json = await fetchJsonWithTimeout(url, 9000);
   const daily = json?.daily || {};
@@ -1461,8 +1480,6 @@ async function fetchSeasonalWeatherForDate(dateObj) {
     description: weatherCode !== null ? getWeatherCodeDescription(weatherCode) : "Długoterminowa prognoza modelowa",
     humidity: Array.isArray(daily.relative_humidity_2m_mean) ? daily.relative_humidity_2m_mean[0] : null,
     pressure: Array.isArray(daily.pressure_msl_mean) ? daily.pressure_msl_mean[0] : null,
-    sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
-    sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
     hourly
   };
 }
@@ -2056,15 +2073,16 @@ function openDay(i) {
     syncTasksForCurrentSchedule(i, schedule, dayCleaning);
 
     const fullDate = d.toLocaleDateString("pl-PL", { day: "numeric", month: "long" });
-    const dayQuote = getRandomQuoteText();
 
-    c.innerHTML = `
-      <div class="day-quote-card">
-        <div class="day-quote-title">Cytat dnia</div>
-        <div class="day-quote-text">${escapeHtml(dayQuote)}</div>
-      </div>
-      <h2>${dayName}, ${fullDate} — Dzień ${i + 1}</h2>
-    `;
+    const allQuotes = getAllQuotes();
+    const rawQuote = allQuotes.length ? allQuotes[Math.floor(Math.random() * allQuotes.length)] : "";
+    const dayQuote = formatQuote(rawQuote);
+    const quoteBox = document.getElementById("dayQuoteText");
+    if (quoteBox) {
+      quoteBox.innerText = dayQuote;
+    }
+
+    c.innerHTML = `<h2>${dayName}, ${fullDate} — Dzień ${i + 1}</h2>`;
 
     const badge = document.createElement("div");
     badge.className = "plan-badge";
