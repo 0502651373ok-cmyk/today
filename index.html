@@ -721,7 +721,7 @@ textarea {
         <label for="planName">Назва схеми</label>
         <input type="text" id="planName" placeholder="Наприклад: Весна 2026">
 
-        <label for="planEffectiveFrom">Діє z дати</label>
+        <label for="planEffectiveFrom">Діє з дати</label>
         <input type="date" id="planEffectiveFrom">
 
         <label for="planMorning">Ранок — ліки / добавки</label>
@@ -731,7 +731,7 @@ textarea {
         <textarea id="planDay" placeholder="Кожен пункт з нового рядка"></textarea>
 
         <label for="planEvening">Вечір — ліки / добавки</label>
-        <textarea id="planEvening" placeholder="Кожен пункт z nowego wiersza"></textarea>
+        <textarea id="planEvening" placeholder="Кожен пункт з нового рядка"></textarea>
 
         <div class="modal-footer">
           <button class="modal-btn" id="savePlanBtn">Зберегти нову схему</button>
@@ -1162,34 +1162,23 @@ function extractEventsFromSpecificSection(html, headingNames) {
     }
 
     node.querySelectorAll?.("ul > li, ol > li").forEach(li => {
-      if (li.closest("li") !== li.parentElement.closest("li")) {
-        const item = extractSingleListItemData(li);
-        if (item) events.push(item);
-      }
+      const item = extractSingleListItemData(li);
+      if (item) events.push(item);
     });
   });
 
   return dedupeEvents(events);
 }
 
-function pickEventsCount(events) {
-  if (!Array.isArray(events) || !events.length) return [];
-  if (events.length <= 8) return events;
-  return events.slice(0, 8);
-}
-
 function extractEventsFromDayPage(html) {
-  // 1) Пріоритет: Wydarzenia w Polsce
   const polishEvents = extractEventsFromSpecificSection(html, ["Wydarzenia w Polsce"]);
-  if (polishEvents.length) return pickEventsCount(polishEvents);
+  if (polishEvents.length) return polishEvents.slice(0, 8);
 
-  // 2) Якщо нема — загальна секція Wydarzenia
   const genericEvents = extractEventsFromSpecificSection(html, ["Wydarzenia"]);
-  if (genericEvents.length) return pickEventsCount(genericEvents);
+  if (genericEvents.length) return genericEvents.slice(0, 8);
 
-  // 3) Технічний запасний варіант для реальної структури деяких сторінок
   const worldEvents = extractEventsFromSpecificSection(html, ["Wydarzenia na świecie"]);
-  if (worldEvents.length) return pickEventsCount(worldEvents);
+  if (worldEvents.length) return worldEvents.slice(0, 8);
 
   return [];
 }
@@ -1608,7 +1597,7 @@ function buildScheduleForDate(dayIndex, weekday, dateObj) {
   const dcos = getCosmeticsForWeekday(weekday);
   const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
   const dayCleaning = cleaningSchedule[weekday];
-  const workout = dayIndex % 2 === 0 ? "Фітнес 40 хв" : "Ходіння z palkami 45 хв";
+  const workout = dayIndex % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
 
   const schedule = {
     РАНОК: [
@@ -2107,7 +2096,7 @@ function renderQuoteList() {
   box.innerHTML = "";
 
   if (!customQuotes.length) {
-    box.innerHTML = `<div class="day-info-muted">Тут поки що немає твоїх własnych fraz.</div>`;
+    box.innerHTML = `<div class="day-info-muted">Тут поки що немає твоїх власних фраз.</div>`;
     return;
   }
 
