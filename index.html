@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="pl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>☀️ Today Is The Day — Щоденник прогресу</title>
+<title>☀️ Today Is The Day — Dziennik postępów</title>
 <link rel="icon" type="image/svg+xml"
 href="data:image/svg+xml,
 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>
@@ -642,7 +642,7 @@ textarea {
 </style>
 </head>
 <body>
-<header>☀️ Today Is The Day — Щоденник прогресу</header>
+<header>☀️ Today Is The Day — Dziennik postępów</header>
 
 <div id="progressBar"><div id="progressFill"></div></div>
 <div id="progressText"></div>
@@ -668,9 +668,9 @@ textarea {
     <div id="content" style="display:none"></div>
 
     <div class="action-buttons">
-      <button class="export" id="exportBtn">💾 Завантажити щоденник (.docx)</button>
-      <button class="meds-btn" id="medicineBtn">💊 Leki</button>
-      <button class="quote-btn" id="quoteManagerBtn">💬 Frazy</button>
+      <button class="export" id="exportBtn">💾 Pobierz dziennik (.docx)</button>
+      <button class="meds-btn" id="medicineBtn">💊 Leki i suplementy</button>
+      <button class="quote-btn" id="quoteManagerBtn">💬 Cytaty</button>
     </div>
   </div>
 
@@ -706,10 +706,10 @@ textarea {
 
 <div id="medicineModal">
   <div class="modal-box">
-    <h3>Схеми ліків і добавок</h3>
+    <h3>Schematy leków i suplementów</h3>
 
     <div class="modal-note">
-      Нова схема починає діяти з вибраної дати. Попередні дні лишаються зі старою схемою.
+      Nowy schemat zaczyna działać od wybranej daty. Poprzednie dni pozostają ze starym schematem.
     </div>
 
     <div class="modal-grid">
@@ -718,59 +718,62 @@ textarea {
       </div>
 
       <div class="plan-form">
-        <label for="planName">Назва схеми</label>
-        <input type="text" id="planName" placeholder="Наприклад: Весна 2026">
+        <label for="planName">Nazwa schematu</label>
+        <input type="text" id="planName" placeholder="Na przykład: Wiosna 2026">
 
-        <label for="planEffectiveFrom">Діє з дати</label>
+        <label for="planEffectiveFrom">Obowiązuje od</label>
         <input type="date" id="planEffectiveFrom">
 
-        <label for="planMorning">Ранок — ліки / добавки</label>
-        <textarea id="planMorning" placeholder="Кожен пункт з нового рядка"></textarea>
+        <label for="planMorning">Rano — leki / suplementy</label>
+        <textarea id="planMorning" placeholder="Każdy punkt w nowej linii"></textarea>
 
-        <label for="planDay">День — ліки / добавки</label>
-        <textarea id="planDay" placeholder="Кожен пункт з нового рядка"></textarea>
+        <label for="planDay">Dzień — leki / suplementy</label>
+        <textarea id="planDay" placeholder="Każdy punkt w nowej linii"></textarea>
 
-        <label for="planEvening">Вечір — ліки / добавки</label>
-        <textarea id="planEvening" placeholder="Кожен пункт з нового рядка"></textarea>
+        <label for="planEvening">Wieczór — leki / suplementy</label>
+        <textarea id="planEvening" placeholder="Każdy punkt w nowej linii"></textarea>
 
         <div class="modal-footer">
-          <button class="modal-btn" id="savePlanBtn">Зберегти нову схему</button>
+          <button class="modal-btn" id="savePlanBtn">Zapisz nowy schemat</button>
         </div>
       </div>
     </div>
 
     <div class="modal-footer">
-      <button class="modal-close" id="closeMedicineModalBtn">Закрити</button>
+      <button class="modal-close" id="closeMedicineModalBtn">Zamknij</button>
     </div>
   </div>
 </div>
 
 <div id="quoteModal">
   <div class="quote-modal-box">
-    <h3>Фрази дня</h3>
+    <h3>Cytaty dnia</h3>
 
     <div class="modal-note">
-      Тут можна додавати свої цінні фрази. Вони будуть змішуватись із базовими.
+      Tutaj możesz dodawać własne ważne cytaty. Będą mieszane z bazowymi.
     </div>
 
     <div class="quote-form">
-      <label for="newQuoteInput">Нова фраза</label>
-      <textarea id="newQuoteInput" placeholder="Встав сюди нову фразу польською"></textarea>
+      <label for="newQuoteInput">Nowy cytat</label>
+      <textarea id="newQuoteInput" placeholder="Wklej tutaj nowy cytat po polsku"></textarea>
       <div class="modal-footer">
-        <button class="modal-btn" id="saveQuoteBtn">Додати фразу</button>
+        <button class="modal-btn" id="saveQuoteBtn">Dodaj cytat</button>
       </div>
     </div>
 
     <div class="quote-list" id="quoteListContent"></div>
 
     <div class="modal-footer">
-      <button class="modal-close" id="closeQuoteModalBtn">Закрити</button>
+      <button class="modal-close" id="closeQuoteModalBtn">Zamknij</button>
     </div>
   </div>
 </div>
 
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
 <script>
-// === 1. Початкові дані ===
+// === 1. Dane początkowe ===
 if (!localStorage.getItem("trackerStartDate")) {
   const now = new Date();
   now.setHours(0,0,0,0);
@@ -793,21 +796,21 @@ let currentYear = today.getFullYear();
 let currentOpenedIndex = todayIndex;
 let currentDayInfoRequestId = 0;
 
-// === 2. Схеми ліків ===
+// === 2. Schematy leków ===
 function getDefaultMedicinePlans() {
   return [
     {
       id: "plan_default",
-      name: "Базова схема",
+      name: "Schemat podstawowy",
       effectiveFrom: startDate.toISOString().slice(0, 10),
       morning: [
-        "Creatine, Vitamin C, Ubiquinol, Мумійо, L-Tryptophan, Magnesium malate, Розторопша, Amino Max"
+        "Creatine, Vitamin C, Ubiquinol, Mumio, L-Tryptophan, Magnesium malate, Ostropest plamisty, Amino Max"
       ],
       day: [
-        "Amino Max, Resveratrol, DHA-500, Vitamin C, Розторопша"
+        "Amino Max, Resveratrol, DHA-500, Vitamin C, Ostropest plamisty"
       ],
       evening: [
-        "Magnesium bisglycinate, L-Tryptophan, Розторопша"
+        "Magnesium bisglycinate, L-Tryptophan, Ostropest plamisty"
       ]
     }
   ];
@@ -856,7 +859,7 @@ function getMedicinePlanForDate(dateObj) {
   return active;
 }
 
-// === 3. Фрази дня ===
+// === 3. Cytaty dnia ===
 const baseQuotes = [
   "Nie zatrzymuj się – nawet jeśli dziś boli.",
   "Jeszcze nic nie jest skończone.",
@@ -890,7 +893,7 @@ function renderRandomQuote() {
   box.innerText = `„${allQuotes[Math.floor(Math.random() * allQuotes.length)]}”`;
 }
 
-// === 4. Польські дати ===
+// === 4. Polskie daty specjalne ===
 const polishSpecialDays = {
   "01-01": ["Nowy Rok"],
   "01-06": ["Święto Trzech Króli"],
@@ -917,7 +920,7 @@ const polishSpecialDays = {
   "12-31": ["Sylwester"]
 };
 
-// === 5. Прогрес-бар ===
+// === 5. Pasek postępu ===
 function updateProgress() {
   let total = 0;
   let done = 0;
@@ -931,7 +934,7 @@ function updateProgress() {
 
   const percent = total ? Math.round(done / total * 100) : 0;
   document.getElementById("progressFill").style.width = percent + "%";
-  document.getElementById("progressText").innerText = "Виконано: " + percent + "%";
+  document.getElementById("progressText").innerText = "Wykonano: " + percent + "%";
 }
 
 function saveData() {
@@ -945,8 +948,8 @@ function capitalizeFirst(str) {
 }
 
 function getMonthTitle(year, month) {
-  const monthName = new Date(year, month, 1).toLocaleDateString("uk-UA", { month: "long" });
-  return `${capitalizeFirst(monthName)} ${year} р.`;
+  const monthName = new Date(year, month, 1).toLocaleDateString("pl-PL", { month: "long" });
+  return `${capitalizeFirst(monthName)} ${year} r.`;
 }
 
 function refreshDayButtonState(i) {
@@ -961,7 +964,7 @@ function refreshDayButtonState(i) {
   btn.classList.add("active-day");
 }
 
-// === 5.1. Утиліти ===
+// === 5.1. Narzędzia ===
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1160,7 +1163,7 @@ async function fetchHistoricalEventsForDate(dateObj) {
   return extractEventsFromSectionHtml(sectionHtml);
 }
 
-// === 5.2. Погода ===
+// === 5.2. Pogoda ===
 const WEATHER_COORDS_CACHE_KEY = "trackerPrudnikCoords";
 const WEATHER_ARCHIVE_PREFIX = "trackerWeatherArchive_";
 
@@ -1519,16 +1522,16 @@ function renderTopWeatherStrip(weatherState) {
   requestAnimationFrame(fitTopWeatherText);
 }
 
-// === 6. Побудова розкладу дня ===
+// === 6. Budowanie planu dnia ===
 function getCosmeticsForWeekday(weekday) {
   const cosmetics = [
-    {morning:["Дарсонваль (обличчя, брови, волосся)","Іонофорез Ion+ z Bielenda (віт.С)","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["Маска Renew Anti Age","SPF 50+"],day:["Відпочинок, зволоження"],evening:[]},
-    {morning:["SPF 50+"],day:[],evening:["Іонофорез Ion− із содовим розчином","Після Retinobaza 17000"]},
-    {morning:["Дарсонваль","Кавітаційна чистка","Після D-Пантенол","SPF 50+"],day:[],evening:[]},
-    {morning:["EMS-L z Bielenda (віт.С)","SPF 50+"],day:[],evening:["EMS-L z Dermogal A+E lub Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Желатинова маска для волосся","Маска Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H z Retinol Collagen Complex","Після D-Пантенол"]},
-    {morning:["Маска Renew Anti Age","Дарсонваль","SPF 50+"],day:[],evening:["Голкова мезотерапія (обличчя+волосся)","Після D-Пантенол"]}
+    {morning:["Darsonval (twarz, brwi, włosy)","Jonoforeza Ion+ z Bielenda (wit. C)","Po zabiegu D-Panthenol","SPF 50+"],day:[],evening:[]},
+    {morning:["Maska Renew Anti Age","SPF 50+"],day:["Odpoczynek, nawilżenie"],evening:[]},
+    {morning:["SPF 50+"],day:[],evening:["Jonoforeza Ion− z roztworem sody","Po zabiegu Retinobaza 17000"]},
+    {morning:["Darsonval","Peeling kawitacyjny","Po zabiegu D-Panthenol","SPF 50+"],day:[],evening:[]},
+    {morning:["EMS-L z Bielenda (wit. C)","SPF 50+"],day:[],evening:["EMS-L z Dermogal A+E lub Retinol Collagen Complex","Po zabiegu D-Panthenol"]},
+    {morning:["Maska żelatynowa do włosów","Maska Renew Anti Age","SPF 50+"],day:[],evening:["EMS-H z Retinol Collagen Complex","Po zabiegu D-Panthenol"]},
+    {morning:["Maska Renew Anti Age","Darsonval","SPF 50+"],day:[],evening:["Mezoterapia mikroigłowa (twarz + włosy)","Po zabiegu D-Panthenol"]}
   ];
   return cosmetics[weekday];
 }
@@ -1536,25 +1539,25 @@ function getCosmeticsForWeekday(weekday) {
 function buildScheduleForDate(dayIndex, weekday, dateObj) {
   const plan = getMedicinePlanForDate(dateObj);
   const dcos = getCosmeticsForWeekday(weekday);
-  const cleaningSchedule = ["Нема","Кухня","Зал","Санвузол","Балкон/коридор","Генеральне","Нема"];
+  const cleaningSchedule = ["Brak","Kuchnia","Salon","Łazienka","Balkon / korytarz","Generalne sprzątanie","Brak"];
   const dayCleaning = cleaningSchedule[weekday];
-  const workout = dayIndex % 2 === 0 ? "Фітнес 40 хв" : "Ходіння з палками 45 хв";
+  const workout = dayIndex % 2 === 0 ? "Fitness 40 min" : "Marsz z kijkami 45 min";
 
   const schedule = {
-    РАНОК: [
-      "☕ Кава з молоком",
+    RANO: [
+      "☕ Kawa z mlekiem",
       ...(plan?.morning || []),
-      "Зарядка для шиї 20 хв + Ляпко 20 хв",
+      "Ćwiczenia na szyję 20 min + Łapko 20 min",
       ...dcos.morning
     ],
-    ДЕНЬ: [
+    DZIEŃ: [
       workout,
       ...(plan?.day || []),
       ...dcos.day
     ],
-    ВЕЧІР: [
+    WIECZÓR: [
       ...(plan?.evening || []),
-      "Розтяжка + дихальні вправи",
+      "Rozciąganie + ćwiczenia oddechowe",
       ...dcos.evening
     ]
   };
@@ -1575,7 +1578,7 @@ function syncTasksForCurrentSchedule(i, schedule, dayCleaning) {
     });
   });
 
-  allowedKeys.add("ПРИБИРАННЯ_" + dayCleaning);
+  allowedKeys.add("SPRZĄTANIE_" + dayCleaning);
 
   const existingTasks = data[i].tasks || {};
   const newTasks = {};
@@ -1587,7 +1590,7 @@ function syncTasksForCurrentSchedule(i, schedule, dayCleaning) {
   data[i].tasks = newTasks;
 }
 
-// === 7. Календар ===
+// === 7. Kalendarz ===
 function showCalendar(selectedIndex = null) {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
@@ -1629,7 +1632,7 @@ function showCalendar(selectedIndex = null) {
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
 
-  const weekDays = ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"];
+  const weekDays = ["Pon","Wt","Śr","Czw","Pt","Sob","Nd"];
   weekDays.forEach(dayName => {
     const wd = document.createElement("div");
     wd.className = "calendar-weekday";
@@ -1656,7 +1659,7 @@ function showCalendar(selectedIndex = null) {
     btn.className = "day-btn";
 
     btn.innerText =
-      `${cellDate.getDate()} ${cellDate.toLocaleString("uk-UA", { month: "short" })}\n(${cellDate.toLocaleString("uk-UA", { weekday: "short" })})`;
+      `${cellDate.getDate()} ${cellDate.toLocaleString("pl-PL", { month: "short" })}\n(${cellDate.toLocaleString("pl-PL", { weekday: "short" })})`;
 
     if (cellDate.toDateString() === today.toDateString()) {
       btn.classList.add("today");
@@ -1686,7 +1689,7 @@ function showCalendar(selectedIndex = null) {
   cal.appendChild(grid);
 }
 
-// === 8. Блок справа ===
+// === 8. Panel po prawej ===
 async function loadDayInfo(dateObj) {
   const box = document.getElementById("dayInfoContent");
   if (!box) return;
@@ -1794,7 +1797,7 @@ async function loadDayInfo(dateObj) {
   box.innerHTML = html;
 }
 
-// === 9. Відкриття дня ===
+// === 9. Otwieranie dnia ===
 function openDay(i) {
   try {
     currentOpenedIndex = i;
@@ -1806,18 +1809,18 @@ function openDay(i) {
     d.setHours(0,0,0,0);
 
     const weekday = d.getDay() === 0 ? 6 : d.getDay() - 1;
-    const weekDays = ["Понеділок","Вівторок","Середа","Четвер","П’ятниця","Субота","Неділя"];
+    const weekDays = ["Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota","Niedziela"];
     const dayName = weekDays[weekday];
 
     const { schedule, dayCleaning, plan } = buildScheduleForDate(i, weekday, d);
     syncTasksForCurrentSchedule(i, schedule, dayCleaning);
 
-    const fullDate = d.toLocaleDateString("uk-UA", { day: "numeric", month: "long" });
-    c.innerHTML = `<h2>${dayName}, ${fullDate} — День ${i + 1}</h2>`;
+    const fullDate = d.toLocaleDateString("pl-PL", { day: "numeric", month: "long" });
+    c.innerHTML = `<h2>${dayName}, ${fullDate} — Dzień ${i + 1}</h2>`;
 
     const badge = document.createElement("div");
     badge.className = "plan-badge";
-    badge.innerHTML = `Схема ліків: ${plan ? escapeHtml(plan.name) : "—"}<small>Діє з ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
+    badge.innerHTML = `Schemat leków: ${plan ? escapeHtml(plan.name) : "—"}<small>Obowiązuje od ${plan ? escapeHtml(plan.effectiveFrom) : "—"}</small>`;
     c.appendChild(badge);
 
     refreshDayButtonState(i);
@@ -1848,9 +1851,9 @@ function openDay(i) {
     }
 
     const clSection = document.createElement("section");
-    clSection.innerHTML = "<h3>ПРИБИРАННЯ</h3>";
+    clSection.innerHTML = "<h3>SPRZĄTANIE</h3>";
 
-    const clKey = "ПРИБИРАННЯ_" + dayCleaning;
+    const clKey = "SPRZĄTANIE_" + dayCleaning;
 
     const clLabel = document.createElement("label");
     const clCheckbox = document.createElement("input");
@@ -1868,10 +1871,10 @@ function openDay(i) {
     c.appendChild(clSection);
 
     const diary = document.createElement("section");
-    diary.innerHTML = "<h3>ЩОДЕННИК</h3>";
+    diary.innerHTML = "<h3>DZIENNIK</h3>";
     const ta = document.createElement("textarea");
     ta.value = data[i].diary || "";
-    ta.placeholder = "Запиши, як минув день...";
+    ta.placeholder = "Zapisz, jak minął dzień...";
     ta.oninput = () => {
       data[i].diary = ta.value;
       saveData();
@@ -1881,7 +1884,7 @@ function openDay(i) {
 
     const back = document.createElement("button");
     back.className = "back";
-    back.innerText = "← Назад до календаря";
+    back.innerText = "← Powrót do kalendarza";
     back.onclick = () => {
       currentMonth = d.getMonth();
       currentYear = d.getFullYear();
@@ -1900,7 +1903,7 @@ function openDay(i) {
   }
 }
 
-// === 10. Модальне вікно ліків ===
+// === 10. Modal leków ===
 const medicineModal = document.getElementById("medicineModal");
 const medicineBtn = document.getElementById("medicineBtn");
 const closeMedicineModalBtn = document.getElementById("closeMedicineModalBtn");
@@ -1913,7 +1916,7 @@ function renderMedicinePlans() {
   const sorted = [...medicinePlans].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
 
   if (!sorted.length) {
-    box.innerHTML = `<div class="day-info-muted">Схем поки що немає.</div>`;
+    box.innerHTML = `<div class="day-info-muted">Nie ma jeszcze żadnych schematów.</div>`;
     return;
   }
 
@@ -1927,10 +1930,10 @@ function renderMedicinePlans() {
 
     card.innerHTML = `
       <h4>${escapeHtml(plan.name)}</h4>
-      <small>Діє z: ${escapeHtml(plan.effectiveFrom)}</small>
-      <div><span>Ранок:</span><ul>${m || "<li>—</li>"}</ul></div>
-      <div><span>День:</span><ul>${d || "<li>—</li>"}</ul></div>
-      <div><span>Вечір:</span><ul>${e || "<li>—</li>"}</ul></div>
+      <small>Obowiązuje od: ${escapeHtml(plan.effectiveFrom)}</small>
+      <div><span>Rano:</span><ul>${m || "<li>—</li>"}</ul></div>
+      <div><span>Dzień:</span><ul>${d || "<li>—</li>"}</ul></div>
+      <div><span>Wieczór:</span><ul>${e || "<li>—</li>"}</ul></div>
     `;
 
     const actions = document.createElement("div");
@@ -1938,13 +1941,13 @@ function renderMedicinePlans() {
 
     const delBtn = document.createElement("button");
     delBtn.className = "delete-plan-btn";
-    delBtn.textContent = "Видалити";
+    delBtn.textContent = "Usuń";
     delBtn.onclick = () => {
       if (medicinePlans.length <= 1) {
-        alert("Останню схему видаляти не можна.");
+        alert("Nie można usunąć ostatniego schematu.");
         return;
       }
-      const ok = confirm(`Видалити схему "${plan.name}"?`);
+      const ok = confirm(`Usunąć schemat "${plan.name}"?`);
       if (!ok) return;
 
       medicinePlans = medicinePlans.filter(x => x.id !== plan.id);
@@ -1993,12 +1996,12 @@ savePlanBtn.onclick = () => {
   const evening = normalizeList(document.getElementById("planEvening").value);
 
   if (!name) {
-    alert("Вкажи назву схеми.");
+    alert("Podaj nazwę schematu.");
     return;
   }
 
   if (!effectiveFrom) {
-    alert("Вкажи дату початку схеми.");
+    alert("Podaj datę rozpoczęcia schematu.");
     return;
   }
 
@@ -2022,7 +2025,7 @@ savePlanBtn.onclick = () => {
   document.getElementById("planEvening").value = "";
 };
 
-// === 11. Frazy ===
+// === 11. Cytaty ===
 const quoteModal = document.getElementById("quoteModal");
 const quoteManagerBtn = document.getElementById("quoteManagerBtn");
 const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
@@ -2033,7 +2036,7 @@ function renderQuoteList() {
   box.innerHTML = "";
 
   if (!customQuotes.length) {
-    box.innerHTML = `<div class="day-info-muted">Тут поки що немає твоїх власних фраз.</div>`;
+    box.innerHTML = `<div class="day-info-muted">Nie ma tu jeszcze Twoich własnych cytatów.</div>`;
     return;
   }
 
@@ -2044,9 +2047,9 @@ function renderQuoteList() {
     item.innerHTML = `
       <div class="quote-item-top">
         <div class="quote-item-text">${escapeHtml(quote)}</div>
-        <button class="quote-delete-btn" data-quote-index="${index}">Видалити</button>
+        <button class="quote-delete-btn" data-quote-index="${index}">Usuń</button>
       </div>
-      <small>Власна фраза</small>
+      <small>Własny cytat</small>
     `;
 
     box.appendChild(item);
@@ -2085,7 +2088,7 @@ saveQuoteBtn.onclick = () => {
   const value = input.value.trim();
 
   if (!value) {
-    alert("Встав фразу.");
+    alert("Wklej cytat.");
     return;
   }
 
@@ -2132,28 +2135,96 @@ document.getElementById("bablaInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") openBablaSearch();
 });
 
-// === 13. Експорт у DOCX ===
-document.getElementById("exportBtn").onclick = function() {
-  let text = "☀️ Today Is The Day — Щоденник прогресu\n\n";
+// === 13. Prawdziwy eksport do DOCX ===
+async function exportDiaryToDocx() {
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
 
-  data.forEach((d, i) => {
-    if (d.diary) {
-      const dt = new Date(startDate);
-      dt.setDate(startDate.getDate() + i);
-      text += `День ${i + 1} (${dt.toLocaleDateString("uk-UA")}):\n${d.diary}\n\n`;
+  const sections = [];
+
+  sections.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 300 },
+      children: [
+        new TextRun({
+          text: "Today Is The Day — Dziennik postępów",
+          bold: true,
+          size: 32
+        })
+      ]
+    })
+  );
+
+  let hasDiaryEntries = false;
+
+  data.forEach((dayData, i) => {
+    if (!dayData.diary || !dayData.diary.trim()) return;
+
+    hasDiaryEntries = true;
+
+    const dt = new Date(startDate);
+    dt.setDate(startDate.getDate() + i);
+
+    const dayTitle = `Dzień ${i + 1} — ${dt.toLocaleDateString("pl-PL", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })}`;
+
+    sections.push(
+      new Paragraph({
+        text: dayTitle,
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 240, after: 120 }
+      })
+    );
+
+    const diaryLines = dayData.diary.replace(/\r/g, "").split("\n");
+
+    diaryLines.forEach(line => {
+      sections.push(
+        new Paragraph({
+          text: line.trim() ? line : " ",
+          spacing: { after: 120 }
+        })
+      );
+    });
+  });
+
+  if (!hasDiaryEntries) {
+    sections.push(
+      new Paragraph({
+        text: "Brak wpisów w dzienniku.",
+        spacing: { after: 120 }
+      })
+    );
+  }
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {},
+        children: sections
+      }
+    ]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, "TodayIsTheDay_Dziennik.docx");
+}
+
+document.getElementById("exportBtn").onclick = async function() {
+  try {
+    if (!window.docx || typeof saveAs !== "function") {
+      alert("Biblioteki eksportu DOCX nie zostały załadowane.");
+      return;
     }
-  });
 
-  const blob = new Blob([text], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-  });
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "TodayIsTheDay_Щоденник.docx";
-  a.click();
-
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    await exportDiaryToDocx();
+  } catch (error) {
+    console.error("Błąd eksportu DOCX:", error);
+    alert("Nie udało się wyeksportować pliku DOCX.");
+  }
 };
 
 // === 14. Resize ===
@@ -2161,7 +2232,7 @@ window.addEventListener("resize", () => {
   fitTopWeatherText();
 });
 
-// === 15. Старт ===
+// === 15. Start ===
 saveMedicinePlans();
 updateProgress();
 renderRandomQuote();
