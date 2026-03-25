@@ -110,13 +110,6 @@ header {
   min-height: calc(1.4em * 2);
 }
 
-.top-weather-loading,
-.top-weather-muted {
-  color: #5f6f52;
-  font-size: 0.95em;
-  line-height: 1.35;
-}
-
 .top-weather-body {
   flex: 1;
   display: flex;
@@ -133,6 +126,13 @@ header {
   max-height: calc(1.34em * 2);
   overflow: hidden;
   word-break: break-word;
+}
+
+.top-weather-loading,
+.top-weather-muted {
+  color: #5f6f52;
+  font-size: 0.95em;
+  line-height: 1.35;
 }
 
 .top-weather-key {
@@ -362,15 +362,6 @@ textarea {
 .day-info-muted {
   color: #666;
   font-style: italic;
-}
-
-.day-info-note {
-  color: #555;
-  background: #f7f7f7;
-  border: 1px solid #e2e2e2;
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 0.93em;
 }
 
 .history-card {
@@ -899,8 +890,6 @@ function renderRandomQuote() {
   box.innerText = `„${allQuotes[Math.floor(Math.random() * allQuotes.length)]}”`;
 }
 
-renderRandomQuote();
-
 // === 4. Польські дати ===
 const polishSpecialDays = {
   "01-01": ["Nowy Rok"],
@@ -1093,15 +1082,27 @@ function extractSingleListItemData(li) {
   };
 }
 
+function dedupeEvents(events) {
+  const seen = new Set();
+  return events.filter(ev => {
+    const key = `${ev.year}|${ev.text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function extractEventsFromSpecificSection(html, preferredHeadingText) {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = html;
 
   const headings = [...wrapper.querySelectorAll("h2, h3, h4")];
+  const wanted = normalizeHeadingText(preferredHeadingText);
+
   const targetHeading = headings.find(h => {
     const headline = h.querySelector(".mw-headline");
     const text = normalizeHeadingText(headline ? headline.textContent : h.textContent);
-    return text === normalizeHeadingText(preferredHeadingText);
+    return text === wanted;
   });
 
   if (!targetHeading) return [];
@@ -1118,23 +1119,17 @@ function extractEventsFromSpecificSection(html, preferredHeadingText) {
     }
   });
 
-  return events;
+  return dedupeEvents(events);
 }
 
 function extractEventsFromDayPage(html) {
-  const fromPolandSection = extractEventsFromSpecificSection(html, "Wydarzenia w Polsce");
-  if (fromPolandSection.length) return fromPolandSection;
-  return extractEventsFromSpecificSection(html, "Wydarzenia");
-}
+  const polishEvents = extractEventsFromSpecificSection(html, "Wydarzenia w Polsce");
+  if (polishEvents.length) return polishEvents;
 
-function dedupeEvents(events) {
-  const seen = new Set();
-  return events.filter(ev => {
-    const key = `${ev.year}|${ev.text}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const genericEvents = extractEventsFromSpecificSection(html, "Wydarzenia");
+  if (genericEvents.length) return genericEvents;
+
+  return [];
 }
 
 // === 5.2. Погода ===
@@ -1156,7 +1151,8 @@ function getStoredWeatherRecord(dateKey) {
 }
 
 function saveWeatherRecord(dateKey, record) {
-  if (getStoredWeatherRecord(dateKey)) return;
+  const existing = getStoredWeatherRecord(dateKey);
+  if (existing) return;
   localStorage.setItem(weatherArchiveKey(dateKey), JSON.stringify(record));
 }
 
@@ -1243,7 +1239,7 @@ function getWeatherCodeDescription(code) {
     81: "Umiarkowane przelotne opady deszczu",
     82: "Gwałtowne przelotne opady deszczu",
     85: "Słabe przelotne opady śniegu",
-    86: "Silne przelotne opady śniegu",
+    86: "Silne przelotne opady śnieгу",
     95: "Burza",
     96: "Burza z lekkim gradem",
     99: "Burza z silnym gradem"
@@ -1251,47 +1247,149 @@ function getWeatherCodeDescription(code) {
   return map[code] || "Brak opisu";
 }
 
-async function fetchTodayWeatherForPrudnik() {
-  const coords = await getPrudnikCoords();
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&current=temperature_2m,apparent_temperature,cloud_cover,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code&daily=sunrise,sunset&timezone=Europe%2FWarsaw&forecast_days=1`;
-  const json = await fetchJsonWithTimeout(url, 9000);
+function getForecastHorizonDays() {
+  return 16;
+}
 
-  const current = json?.current || {};
+function getSeasonalHorizonDays() {
+  return 46;
+}
+
+function getDayDistanceFromToday(dateObj) {
+  const target = new Date(dateObj);
+  target.setHours(0,0,0,0);
+  return Math.floor((target - today) / (1000 * 60 * 60 * 24));
+}
+
+function pickHourIndex(times, targetHour = 12) {
+  if (!Array.isArray(times) || !times.length) return -1;
+
+  const exact = times.findIndex(t => {
+    const dt = new Date(t);
+    return !Number.isNaN(dt.getTime()) && dt.getHours() === targetHour;
+  });
+  if (exact !== -1) return exact;
+
+  const midday = times.findIndex(t => String(t).endsWith("12:00"));
+  if (midday !== -1) return midday;
+
+  return Math.floor(times.length / 2);
+}
+
+async function fetchHistoricalWeatherForDate(dateObj) {
+  const coords = await getPrudnikCoords();
+  const dateKey = formatYMD(dateObj);
+
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,cloud_cover,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code&daily=sunrise,sunset&timezone=Europe%2FWarsaw`;
+
+  const json = await fetchJsonWithTimeout(url, 9000);
+  const hourly = json?.hourly || {};
   const daily = json?.daily || {};
+  const times = Array.isArray(hourly.time) ? hourly.time : [];
+  const idx = pickHourIndex(times, 12);
+
+  if (idx < 0) throw new Error("Brak danych godzinowych");
+
+  const weatherCode = hourly.weather_code?.[idx] ?? null;
 
   return {
     city: "Prudnik",
     country: "Polska",
-    date: formatYMD(today),
+    date: dateKey,
     fetchedAt: new Date().toISOString(),
-    temperature: current.temperature_2m ?? null,
-    apparentTemperature: current.apparent_temperature ?? null,
-    cloudCover: current.cloud_cover ?? null,
-    precipitation: current.precipitation ?? null,
-    humidity: current.relative_humidity_2m ?? null,
-    pressure: current.pressure_msl ?? null,
-    wind: current.wind_speed_10m ?? null,
+    sourceType: "archive",
+    temperature: hourly.temperature_2m?.[idx] ?? null,
+    apparentTemperature: hourly.apparent_temperature?.[idx] ?? null,
+    cloudCover: hourly.cloud_cover?.[idx] ?? null,
+    precipitation: hourly.precipitation?.[idx] ?? null,
+    humidity: hourly.relative_humidity_2m?.[idx] ?? null,
+    pressure: hourly.pressure_msl?.[idx] ?? null,
+    wind: hourly.wind_speed_10m?.[idx] ?? null,
     sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
     sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
-    weatherCode: current.weather_code ?? null,
-    description: getWeatherCodeDescription(current.weather_code)
+    weatherCode,
+    description: getWeatherCodeDescription(weatherCode)
+  };
+}
+
+async function fetchForecastWeatherForDate(dateObj) {
+  const coords = await getPrudnikCoords();
+  const dateKey = formatYMD(dateObj);
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,cloud_cover,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code&daily=sunrise,sunset&timezone=Europe%2FWarsaw`;
+
+  const json = await fetchJsonWithTimeout(url, 9000);
+  const hourly = json?.hourly || {};
+  const daily = json?.daily || {};
+  const times = Array.isArray(hourly.time) ? hourly.time : [];
+  const idx = pickHourIndex(times, 12);
+
+  if (idx < 0) throw new Error("Brak danych forecast");
+
+  const weatherCode = hourly.weather_code?.[idx] ?? null;
+
+  return {
+    city: "Prudnik",
+    country: "Polska",
+    date: dateKey,
+    fetchedAt: new Date().toISOString(),
+    sourceType: "forecast",
+    temperature: hourly.temperature_2m?.[idx] ?? null,
+    apparentTemperature: hourly.apparent_temperature?.[idx] ?? null,
+    cloudCover: hourly.cloud_cover?.[idx] ?? null,
+    precipitation: hourly.precipitation?.[idx] ?? null,
+    humidity: hourly.relative_humidity_2m?.[idx] ?? null,
+    pressure: hourly.pressure_msl?.[idx] ?? null,
+    wind: hourly.wind_speed_10m?.[idx] ?? null,
+    sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
+    sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
+    weatherCode,
+    description: getWeatherCodeDescription(weatherCode)
+  };
+}
+
+async function fetchSeasonalWeatherForDate(dateObj) {
+  const coords = await getPrudnikCoords();
+  const dateKey = formatYMD(dateObj);
+
+  const url = `https://seasonal-api.open-meteo.com/v1/seasonal?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&daily=weather_code,temperature_2m_mean,apparent_temperature_mean,relative_humidity_2m_mean,cloud_cover_mean,pressure_msl_mean,wind_speed_10m_mean,precipitation_sum,sunrise,sunset&timezone=Europe%2FWarsaw`;
+
+  const json = await fetchJsonWithTimeout(url, 9000);
+  const daily = json?.daily || {};
+  const weatherCode = Array.isArray(daily.weather_code) ? daily.weather_code[0] : null;
+
+  return {
+    city: "Prudnik",
+    country: "Polska",
+    date: dateKey,
+    fetchedAt: new Date().toISOString(),
+    sourceType: "seasonal",
+    temperature: Array.isArray(daily.temperature_2m_mean) ? daily.temperature_2m_mean[0] : null,
+    apparentTemperature: Array.isArray(daily.apparent_temperature_mean) ? daily.apparent_temperature_mean[0] : null,
+    cloudCover: Array.isArray(daily.cloud_cover_mean) ? daily.cloud_cover_mean[0] : null,
+    precipitation: Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum[0] : null,
+    humidity: Array.isArray(daily.relative_humidity_2m_mean) ? daily.relative_humidity_2m_mean[0] : null,
+    pressure: Array.isArray(daily.pressure_msl_mean) ? daily.pressure_msl_mean[0] : null,
+    wind: Array.isArray(daily.wind_speed_10m_mean) ? daily.wind_speed_10m_mean[0] : null,
+    sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
+    sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
+    weatherCode,
+    description: weatherCode !== null ? getWeatherCodeDescription(weatherCode) : "Długoterminowa prognoza modelowa"
   };
 }
 
 async function resolveWeatherForDate(dateObj) {
   const dateKey = formatYMD(dateObj);
   const stored = getStoredWeatherRecord(dateKey);
-  if (stored) {
-    return {
-      status: "stored",
-      data: stored
-    };
-  }
+  const dayDiff = getDayDistanceFromToday(dateObj);
 
-  const selectedTime = dateObj.getTime();
-  const todayTime = today.getTime();
-
-  if (selectedTime < todayTime) {
+  if (dayDiff < 0) {
+    if (stored) {
+      return {
+        status: "stored",
+        data: stored
+      };
+    }
     return {
       status: "missing-archive",
       data: null,
@@ -1299,30 +1397,67 @@ async function resolveWeatherForDate(dateObj) {
     };
   }
 
-  if (selectedTime > todayTime) {
-    return {
-      status: "future",
-      data: null,
-      message: "Pogoda dla przyszłej daty nie została jeszcze zapisana."
-    };
+  if (dayDiff === 0) {
+    try {
+      const fetched = await fetchForecastWeatherForDate(dateObj);
+      saveWeatherRecord(dateKey, fetched);
+      return {
+        status: "fetched",
+        data: fetched
+      };
+    } catch {
+      if (stored) {
+        return {
+          status: "stored",
+          data: stored
+        };
+      }
+      return {
+        status: "unavailable",
+        data: null,
+        message: "Nie udało się pobrać pogody dla dzisiejszej daty."
+      };
+    }
   }
 
-  try {
-    const fetched = await fetchTodayWeatherForPrudnik();
-    saveWeatherRecord(dateKey, fetched);
-    const saved = getStoredWeatherRecord(dateKey) || fetched;
-
-    return {
-      status: "fetched",
-      data: saved
-    };
-  } catch {
-    return {
-      status: "unavailable",
-      data: null,
-      message: "Nie udało się teraz pobrać pogody dla Prudnika."
-    };
+  if (dayDiff > 0 && dayDiff <= getForecastHorizonDays()) {
+    try {
+      const fetched = await fetchForecastWeatherForDate(dateObj);
+      return {
+        status: "forecast",
+        data: fetched
+      };
+    } catch {
+      return {
+        status: "unavailable",
+        data: null,
+        message: "Nie udało się pobrać prognozy pogody."
+      };
+    }
   }
+
+  if (dayDiff > getForecastHorizonDays() && dayDiff <= getSeasonalHorizonDays()) {
+    try {
+      const fetched = await fetchSeasonalWeatherForDate(dateObj);
+      return {
+        status: "seasonal",
+        data: fetched,
+        message: "To długoterminowa prognoza modelowa."
+      };
+    } catch {
+      return {
+        status: "unavailable",
+        data: null,
+        message: "Długoterminowa prognoza nie jest dostępna."
+      };
+    }
+  }
+
+  return {
+    status: "out-of-range",
+    data: null,
+    message: "Prognoza dla tak odległej daty nie jest dostępna."
+  };
 }
 
 function buildTopWeatherHtml(weatherState) {
@@ -1332,6 +1467,7 @@ function buildTopWeatherHtml(weatherState) {
   }
 
   const w = weatherState.data;
+
   return `
     <div class="top-weather-content" id="topWeatherContent">
       ${escapeHtml(w.description || "Brak opisu")}
@@ -1370,7 +1506,7 @@ function fitTopWeatherText() {
   content.style.fontSize = size + "em";
 
   let guard = 0;
-  while (content.scrollHeight > content.clientHeight + 1 && size > 0.80 && guard < 20) {
+  while (content.scrollHeight > content.clientHeight + 1 && size > 0.78 && guard < 24) {
     size -= 0.02;
     content.style.fontSize = size.toFixed(2) + "em";
     guard++;
@@ -1588,6 +1724,13 @@ async function loadDayInfo(dateObj) {
 
   const holidaysPromise = (async () => {
     try {
+      const mmdd = dateKey.slice(5);
+      const local = polishSpecialDays[mmdd] || [];
+
+      if (local.length) {
+        return { ok: true, data: local.map(name => ({ localName: name, name })) };
+      }
+
       const year = dateObj.getFullYear();
       const holidayData = await fetchJsonWithTimeout(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`, 7000);
       const result = Array.isArray(holidayData)
@@ -1595,7 +1738,9 @@ async function loadDayInfo(dateObj) {
         : [];
       return { ok: true, data: result };
     } catch {
-      return { ok: false, data: [] };
+      const mmdd = dateKey.slice(5);
+      const local = polishSpecialDays[mmdd] || [];
+      return { ok: true, data: local.map(name => ({ localName: name, name })) };
     }
   })();
 
@@ -2022,7 +2167,7 @@ document.getElementById("exportBtn").onclick = function() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
 
-// === 14. Реакція на resize ===
+// === 14. Resize ===
 window.addEventListener("resize", () => {
   fitTopWeatherText();
 });
@@ -2030,6 +2175,7 @@ window.addEventListener("resize", () => {
 // === 15. Старт ===
 saveMedicinePlans();
 updateProgress();
+renderRandomQuote();
 showCalendar(todayIndex);
 openDay(todayIndex);
 </script>
