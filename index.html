@@ -1013,12 +1013,7 @@ function getPolishWikiDayTitle(dateObj) {
     "stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca",
     "lipca", "sierpnia", "września", "października", "listopada", "grudnia"
   ];
-  return `${dateObj.getDate()}_${months[dateObj.getMonth()]}`;
-}
-
-async function fetchWikiParsePage(title) {
-  const url = `https://pl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=text&formatversion=2&format=json&origin=*`;
-  return await fetchJsonWithTimeout(url, 9000);
+  return `${dateObj.getDate()} ${months[dateObj.getMonth()]}`;
 }
 
 function cleanText(text) {
@@ -1029,29 +1024,19 @@ function cleanText(text) {
 }
 
 function normalizeHeadingText(text) {
-  return cleanText(text)
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
+  return cleanText(text).toLowerCase();
 }
 
-function getSectionNodesAfterHeading(headingEl) {
-  if (!headingEl) return [];
-  const sectionNodes = [];
-  const currentLevel = Number((headingEl.tagName || "").replace("H", "")) || 2;
+async function fetchWikiSections(title) {
+  const url = `https://pl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&origin=*`;
+  const json = await fetchJsonWithTimeout(url, 9000);
+  return Array.isArray(json?.parse?.sections) ? json.parse.sections : [];
+}
 
-  let node = headingEl.nextElementSibling;
-  while (node) {
-    const tag = (node.tagName || "").toUpperCase();
-    if (/^H[1-6]$/.test(tag)) {
-      const nextLevel = Number(tag.replace("H", ""));
-      if (nextLevel <= currentLevel) break;
-    }
-    sectionNodes.push(node);
-    node = node.nextElementSibling;
-  }
-
-  return sectionNodes;
+async function fetchWikiSectionHtml(title, sectionIndex) {
+  const url = `https://pl.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=text&section=${encodeURIComponent(sectionIndex)}&formatversion=2&format=json&origin=*`;
+  const json = await fetchJsonWithTimeout(url, 9000);
+  return json?.parse?.text || "";
 }
 
 function isValidWikiArticleHref(href) {
@@ -1068,9 +1053,7 @@ function isWeakGenericWikiTarget(href) {
   const decoded = decodeURIComponent(rawTitle).replace(/_/g, " ").trim().toLowerCase();
 
   if (/^\d{1,4}$/.test(decoded)) return true;
-  if (/^\d{1,2} [a-ząćęłńóśźż]+$/.test(decoded)) return true;
   if (/^\d{1,2}\s+[a-ząćęłńóśźż]+$/.test(decoded)) return true;
-  if (/^\d{1,2}\s*[–-]\s*\d{1,2}\s+[a-ząćęłńóśźż]+$/.test(decoded)) return true;
   if (/^\d+ wiek$/.test(decoded)) return true;
   if (/^\d+_wiek$/.test(rawTitle.toLowerCase())) return true;
   if (decoded === "polska") return true;
@@ -1098,18 +1081,15 @@ function extractBestEventLink(li) {
 
 function extractSingleListItemData(li) {
   const cloned = li.cloneNode(true);
-
   cloned.querySelectorAll("sup, .reference, .mw-editsection, style, script, .thumb, .noprint").forEach(el => el.remove());
   cloned.querySelectorAll("ul, ol, dl").forEach(el => el.remove());
 
   const text = cleanText(cloned.textContent || "");
   const match = text.match(/^(\d{3,4})\s*[–—-]\s*(.+)$/);
-
   if (!match) return null;
 
   const year = match[1];
   const description = cleanText(match[2]);
-
   if (!description) return null;
 
   return {
@@ -1129,58 +1109,55 @@ function dedupeEvents(events) {
   });
 }
 
-function findMatchingHeading(wrapper, headingNames) {
-  const headings = [...wrapper.querySelectorAll("h2, h3, h4, h5")];
-  const wanted = headingNames.map(normalizeHeadingText);
+function findBestSection(sections) {
+  const normalized = sections.map(sec => ({
+    ...sec,
+    lineNormalized: normalizeHeadingText(sec.line || "")
+  }));
 
-  return headings.find(h => {
-    const headline = h.querySelector(".mw-headline");
-    const text = normalizeHeadingText(headline ? headline.textContent : h.textContent);
-    return wanted.includes(text);
-  }) || null;
+  const firstChoice = normalized.find(sec => sec.lineNormalized === "wydarzenia w polsce");
+  if (firstChoice) return firstChoice;
+
+  const secondChoice = normalized.find(sec => sec.lineNormalized === "wydarzenia");
+  if (secondChoice) return secondChoice;
+
+  const thirdChoice = normalized.find(sec => sec.lineNormalized === "wydarzenia na świecie");
+  if (thirdChoice) return thirdChoice;
+
+  return null;
 }
 
-function extractEventsFromSpecificSection(html, headingNames) {
+function extractEventsFromSectionHtml(html) {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = html;
 
-  const targetHeading = findMatchingHeading(wrapper, headingNames);
-  if (!targetHeading) return [];
-
-  const sectionNodes = getSectionNodesAfterHeading(targetHeading);
   const events = [];
+  const rootLists = [...wrapper.querySelectorAll("ul, ol")];
 
-  sectionNodes.forEach(node => {
-    const tag = (node.tagName || "").toUpperCase();
-
-    if (tag === "UL" || tag === "OL") {
-      [...node.querySelectorAll(":scope > li")].forEach(li => {
-        const item = extractSingleListItemData(li);
-        if (item) events.push(item);
-      });
-      return;
-    }
-
-    node.querySelectorAll?.("ul > li, ol > li").forEach(li => {
-      const item = extractSingleListItemData(li);
+  rootLists.forEach(list => {
+    [...list.children].forEach(child => {
+      if (!child || child.tagName !== "LI") return;
+      const item = extractSingleListItemData(child);
       if (item) events.push(item);
     });
   });
 
-  return dedupeEvents(events);
+  return dedupeEvents(events).slice(0, 8);
 }
 
-function extractEventsFromDayPage(html) {
-  const polishEvents = extractEventsFromSpecificSection(html, ["Wydarzenia w Polsce"]);
-  if (polishEvents.length) return polishEvents.slice(0, 8);
+async function fetchHistoricalEventsForDate(dateObj) {
+  const title = getPolishWikiDayTitle(dateObj);
+  const sections = await fetchWikiSections(title);
 
-  const genericEvents = extractEventsFromSpecificSection(html, ["Wydarzenia"]);
-  if (genericEvents.length) return genericEvents.slice(0, 8);
+  if (!sections.length) return [];
 
-  const worldEvents = extractEventsFromSpecificSection(html, ["Wydarzenia na świecie"]);
-  if (worldEvents.length) return worldEvents.slice(0, 8);
+  const targetSection = findBestSection(sections);
+  if (!targetSection?.index) return [];
 
-  return [];
+  const sectionHtml = await fetchWikiSectionHtml(title, targetSection.index);
+  if (!sectionHtml) return [];
+
+  return extractEventsFromSectionHtml(sectionHtml);
 }
 
 // === 5.2. Погода ===
@@ -1325,42 +1302,6 @@ function pickHourIndex(times, targetHour = 12) {
   if (midday !== -1) return midday;
 
   return Math.floor(times.length / 2);
-}
-
-async function fetchHistoricalWeatherForDate(dateObj) {
-  const coords = await getPrudnikCoords();
-  const dateKey = formatYMD(dateObj);
-
-  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,cloud_cover,precipitation,relative_humidity_2m,pressure_msl,wind_speed_10m,weather_code&daily=sunrise,sunset&timezone=Europe%2FWarsaw`;
-
-  const json = await fetchJsonWithTimeout(url, 9000);
-  const hourly = json?.hourly || {};
-  const daily = json?.daily || {};
-  const times = Array.isArray(hourly.time) ? hourly.time : [];
-  const idx = pickHourIndex(times, 12);
-
-  if (idx < 0) throw new Error("Brak danych godzinowych");
-
-  const weatherCode = hourly.weather_code?.[idx] ?? null;
-
-  return {
-    city: "Prudnik",
-    country: "Polska",
-    date: dateKey,
-    fetchedAt: new Date().toISOString(),
-    sourceType: "archive",
-    temperature: hourly.temperature_2m?.[idx] ?? null,
-    apparentTemperature: hourly.apparent_temperature?.[idx] ?? null,
-    cloudCover: hourly.cloud_cover?.[idx] ?? null,
-    precipitation: hourly.precipitation?.[idx] ?? null,
-    humidity: hourly.relative_humidity_2m?.[idx] ?? null,
-    pressure: hourly.pressure_msl?.[idx] ?? null,
-    wind: hourly.wind_speed_10m?.[idx] ?? null,
-    sunrise: Array.isArray(daily.sunrise) ? daily.sunrise[0] : null,
-    sunset: Array.isArray(daily.sunset) ? daily.sunset[0] : null,
-    weatherCode,
-    description: getWeatherCodeDescription(weatherCode)
-  };
 }
 
 async function fetchForecastWeatherForDate(dateObj) {
@@ -1797,11 +1738,7 @@ async function loadDayInfo(dateObj) {
 
   const historyPromise = (async () => {
     try {
-      const wikiTitle = getPolishWikiDayTitle(dateObj);
-      const parsed = await fetchWikiParsePage(wikiTitle);
-      const html = parsed?.parse?.text || "";
-      const extracted = extractEventsFromDayPage(html);
-      const events = dedupeEvents(extracted).slice(0, 8);
+      const events = await fetchHistoricalEventsForDate(dateObj);
       return { ok: true, data: events };
     } catch (err) {
       console.error("Błąd pobierania wydarzeń historycznych:", err);
@@ -2197,7 +2134,7 @@ document.getElementById("bablaInput").addEventListener("keydown", (e) => {
 
 // === 13. Експорт у DOCX ===
 document.getElementById("exportBtn").onclick = function() {
-  let text = "☀️ Today Is The Day — Щоденник прогресу\n\n";
+  let text = "☀️ Today Is The Day — Щоденник прогресu\n\n";
 
   data.forEach((d, i) => {
     if (d.diary) {
