@@ -868,31 +868,262 @@ textarea {
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
-<script>
-// === 1. Dane początkowe ===
-if (!localStorage.getItem("trackerStartDate")) {
-  const now = new Date();
-  now.setHours(0,0,0,0);
-  localStorage.setItem("trackerStartDate", now.toISOString());
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDPErHQw5lGS_qlngpP1M0wcrirDowyADM",
+  authDomain: "tempo-b6986.firebaseapp.com",
+  databaseURL: "https://tempo-b6986-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "tempo-b6986",
+  storageBucket: "tempo-b6986.firebasestorage.app",
+  messagingSenderId: "925795835844",
+  appId: "1:925795835844:web:61cb2adadef11c8ccf4e91"
+};
+
+const FIREBASE_ROOT_PATH = "today-is-the-day/shared";
+const WEATHER_COORDS_CACHE_KEY = "trackerPrudnikCoords";
+const WEATHER_ARCHIVE_PREFIX = "trackerWeatherArchive_";
+
+function isFirebaseConfigured(config) {
+  if (!config) return false;
+  const values = Object.values(config);
+  if (!values.length) return false;
+  return values.every(value => typeof value === "string" && value.trim() !== "");
 }
 
-const startDate = new Date(localStorage.getItem("trackerStartDate"));
-startDate.setHours(0,0,0,0);
+const firebaseEnabled = isFirebaseConfigured(FIREBASE_CONFIG);
 
-const today = new Date();
-today.setHours(0,0,0,0);
+let firebaseApp = null;
+let firebaseDb = null;
+let remoteRootRef = null;
+let remoteListenerAttached = false;
+let isApplyingRemoteState = false;
+let remoteReady = false;
+let isRemoteUpdatingUi = false;
 
+if (firebaseEnabled) {
+  firebaseApp = initializeApp(FIREBASE_CONFIG);
+  firebaseDb = getDatabase(firebaseApp);
+  remoteRootRef = ref(firebaseDb, FIREBASE_ROOT_PATH);
+}
+
+function getTodayDate() {
+  const dt = new Date();
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function ensureLocalStartDateExists() {
+  if (!localStorage.getItem("trackerStartDate")) {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    localStorage.setItem("trackerStartDate", now.toISOString());
+  }
+}
+
+ensureLocalStartDateExists();
+
+let startDate = new Date(localStorage.getItem("trackerStartDate"));
+startDate.setHours(0, 0, 0, 0);
+
+let today = getTodayDate();
 let diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
 if (diffDays < 0) diffDays = 0;
 
-const todayIndex = diffDays;
+let todayIndex = diffDays;
 let data = JSON.parse(localStorage.getItem("trackerData")) || [];
 let currentMonth = today.getMonth();
 let currentYear = today.getFullYear();
 let currentOpenedIndex = todayIndex;
 let currentDayInfoRequestId = 0;
 
-// === 2. Schematy leków ===
+function weatherArchiveKey(dateKey) {
+  return `${WEATHER_ARCHIVE_PREFIX}${dateKey}`;
+}
+
+function getAllWeatherArchiveFromLocalStorage() {
+  const archive = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(WEATHER_ARCHIVE_PREFIX)) {
+      archive[key] = localStorage.getItem(key);
+    }
+  }
+  return archive;
+}
+
+function writeWeatherArchiveToLocalStorage(archiveObj) {
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(WEATHER_ARCHIVE_PREFIX)) {
+      localStorage.removeItem(key);
+    }
+  }
+
+  if (!archiveObj || typeof archiveObj !== "object") return;
+
+  Object.entries(archiveObj).forEach(([key, value]) => {
+    if (key.startsWith(WEATHER_ARCHIVE_PREFIX) && typeof value === "string") {
+      localStorage.setItem(key, value);
+    }
+  });
+}
+
+function buildRemoteStateSnapshot() {
+  return {
+    trackerStartDate: localStorage.getItem("trackerStartDate"),
+    trackerData: localStorage.getItem("trackerData"),
+    trackerMedicinePlans: localStorage.getItem("trackerMedicinePlans"),
+    trackerCustomQuotes: localStorage.getItem("trackerCustomQuotes"),
+    trackerPrudnikCoords: localStorage.getItem(WEATHER_COORDS_CACHE_KEY),
+    weatherArchive: getAllWeatherArchiveFromLocalStorage(),
+    meta: {
+      updatedAt: new Date().toISOString()
+    }
+  };
+}
+
+function applyRemoteStateToLocalStorage(remoteState) {
+  if (!remoteState || typeof remoteState !== "object") return false;
+
+  if (typeof remoteState.trackerStartDate === "string") {
+    localStorage.setItem("trackerStartDate", remoteState.trackerStartDate);
+  }
+
+  if (typeof remoteState.trackerData === "string") {
+    localStorage.setItem("trackerData", remoteState.trackerData);
+  }
+
+  if (typeof remoteState.trackerMedicinePlans === "string") {
+    localStorage.setItem("trackerMedicinePlans", remoteState.trackerMedicinePlans);
+  }
+
+  if (typeof remoteState.trackerCustomQuotes === "string") {
+    localStorage.setItem("trackerCustomQuotes", remoteState.trackerCustomQuotes);
+  }
+
+  if (typeof remoteState.trackerPrudnikCoords === "string") {
+    localStorage.setItem(WEATHER_COORDS_CACHE_KEY, remoteState.trackerPrudnikCoords);
+  }
+
+  writeWeatherArchiveToLocalStorage(remoteState.weatherArchive);
+  return true;
+}
+
+function refreshStateFromLocalStorage() {
+  ensureLocalStartDateExists();
+
+  today = getTodayDate();
+
+  startDate = new Date(localStorage.getItem("trackerStartDate"));
+  startDate.setHours(0, 0, 0, 0);
+
+  diffDays = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) diffDays = 0;
+
+  todayIndex = diffDays;
+  data = JSON.parse(localStorage.getItem("trackerData")) || [];
+  medicinePlans = JSON.parse(localStorage.getItem("trackerMedicinePlans")) || getDefaultMedicinePlans();
+  customQuotes = JSON.parse(localStorage.getItem("trackerCustomQuotes")) || [];
+
+  if (typeof currentOpenedIndex !== "number" || currentOpenedIndex < 0) {
+    currentOpenedIndex = todayIndex;
+  }
+
+  ensureDayExists(todayIndex);
+}
+
+function persistStateLocallyOnly() {
+  localStorage.setItem("trackerStartDate", startDate.toISOString());
+  localStorage.setItem("trackerData", JSON.stringify(data));
+  localStorage.setItem("trackerMedicinePlans", JSON.stringify(medicinePlans));
+  localStorage.setItem("trackerCustomQuotes", JSON.stringify(customQuotes));
+}
+
+async function pushStateToRemote() {
+  if (!firebaseEnabled || !remoteRootRef || isApplyingRemoteState) return;
+  const snapshot = buildRemoteStateSnapshot();
+  await set(remoteRootRef, snapshot);
+}
+
+function redrawAfterRemoteSync() {
+  if (isRemoteUpdatingUi) return;
+  isRemoteUpdatingUi = true;
+
+  try {
+    updateProgress();
+
+    const openedDate = new Date(startDate);
+    openedDate.setDate(startDate.getDate() + currentOpenedIndex);
+
+    currentMonth = openedDate.getMonth();
+    currentYear = openedDate.getFullYear();
+
+    showCalendar(currentOpenedIndex);
+    openDay(currentOpenedIndex);
+  } finally {
+    isRemoteUpdatingUi = false;
+  }
+}
+
+async function initSync() {
+  persistStateLocallyOnly();
+
+  if (!firebaseEnabled || !remoteRootRef) {
+    refreshStateFromLocalStorage();
+    return;
+  }
+
+  try {
+    const snap = await get(remoteRootRef);
+
+    if (snap.exists()) {
+      isApplyingRemoteState = true;
+      applyRemoteStateToLocalStorage(snap.val());
+      isApplyingRemoteState = false;
+    } else {
+      await set(remoteRootRef, buildRemoteStateSnapshot());
+    }
+
+    refreshStateFromLocalStorage();
+
+    if (!remoteListenerAttached) {
+      onValue(remoteRootRef, (snapshot) => {
+        if (!snapshot.exists()) return;
+        if (isApplyingRemoteState) return;
+
+        isApplyingRemoteState = true;
+        applyRemoteStateToLocalStorage(snapshot.val());
+        refreshStateFromLocalStorage();
+        redrawAfterRemoteSync();
+        isApplyingRemoteState = false;
+      });
+
+      remoteListenerAttached = true;
+    }
+
+    remoteReady = true;
+  } catch (error) {
+    console.error("Błąd inicjalizacji synchronizacji Firebase:", error);
+    refreshStateFromLocalStorage();
+  }
+}
+
+async function saveAllState() {
+  persistStateLocallyOnly();
+  updateProgress();
+
+  if (firebaseEnabled) {
+    try {
+      await pushStateToRemote();
+    } catch (error) {
+      console.error("Błąd synchronizacji do Firebase:", error);
+    }
+  }
+}
+
 function getDefaultMedicinePlans() {
   return [
     {
@@ -915,7 +1146,7 @@ function getDefaultMedicinePlans() {
 let medicinePlans = JSON.parse(localStorage.getItem("trackerMedicinePlans")) || getDefaultMedicinePlans();
 
 function saveMedicinePlans() {
-  localStorage.setItem("trackerMedicinePlans", JSON.stringify(medicinePlans));
+  saveAllState();
 }
 
 function ensureDayExists(i) {
@@ -955,7 +1186,6 @@ function getMedicinePlanForDate(dateObj) {
   return active;
 }
 
-// === 3. Cytaty dnia ===
 const baseQuotes = [
   "Nie zatrzymuj się – nawet jeśli dziś boli",
   "Jeszcze nic nie jest skończone",
@@ -972,7 +1202,7 @@ const baseQuotes = [
 let customQuotes = JSON.parse(localStorage.getItem("trackerCustomQuotes")) || [];
 
 function saveCustomQuotes() {
-  localStorage.setItem("trackerCustomQuotes", JSON.stringify(customQuotes));
+  saveAllState();
 }
 
 function getAllQuotes() {
@@ -994,7 +1224,6 @@ function formatQuote(text) {
   return `«${trimmed}».`;
 }
 
-// === 4. Polskie daty specjalne ===
 const polishSpecialDays = {
   "01-01": ["Nowy Rok"],
   "01-06": ["Święto Trzech Króli"],
@@ -1021,7 +1250,6 @@ const polishSpecialDays = {
   "12-31": ["Sylwester"]
 };
 
-// === 5. Pasek postępu ===
 function updateProgress() {
   let total = 0;
   let done = 0;
@@ -1039,8 +1267,7 @@ function updateProgress() {
 }
 
 function saveData() {
-  localStorage.setItem("trackerData", JSON.stringify(data));
-  updateProgress();
+  saveAllState();
 }
 
 function capitalizeFirst(str) {
@@ -1065,7 +1292,6 @@ function refreshDayButtonState(i) {
   btn.classList.add("active-day");
 }
 
-// === 5.1. Narzędzia ===
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -1264,14 +1490,6 @@ async function fetchHistoricalEventsForDate(dateObj) {
   return extractEventsFromSectionHtml(sectionHtml);
 }
 
-// === 5.2. Pogoda ===
-const WEATHER_COORDS_CACHE_KEY = "trackerPrudnikCoords";
-const WEATHER_ARCHIVE_PREFIX = "trackerWeatherArchive_";
-
-function weatherArchiveKey(dateKey) {
-  return `${WEATHER_ARCHIVE_PREFIX}${dateKey}`;
-}
-
 function getStoredWeatherRecord(dateKey) {
   const raw = localStorage.getItem(weatherArchiveKey(dateKey));
   if (!raw) return null;
@@ -1286,6 +1504,10 @@ function saveWeatherRecord(dateKey, record) {
   const existing = getStoredWeatherRecord(dateKey);
   if (existing && existing.hourly) return;
   localStorage.setItem(weatherArchiveKey(dateKey), JSON.stringify(record));
+
+  if (firebaseEnabled && remoteReady) {
+    pushStateToRemote().catch(error => console.error("Błąd synchronizacji pogody:", error));
+  }
 }
 
 async function getPrudnikCoords() {
@@ -1319,6 +1541,11 @@ async function getPrudnikCoords() {
   };
 
   localStorage.setItem(WEATHER_COORDS_CACHE_KEY, JSON.stringify(coords));
+
+  if (firebaseEnabled && remoteReady) {
+    pushStateToRemote().catch(error => console.error("Błąd synchronizacji współrzędnych:", error));
+  }
+
   return coords;
 }
 
@@ -1779,7 +2006,6 @@ function renderTopWeatherStrip(weatherState) {
   `;
 }
 
-// === 6. Budowanie planu dnia ===
 function getCosmeticsForWeekday(weekday) {
   const cosmetics = [
     {morning:["Darsonval (twarz, brwi, włosy)","Jonoforeza Ion+ z Bielenda (wit. C)","Po zabiegu D-Panthenol","SPF 50+"],day:[],evening:[]},
@@ -1847,7 +2073,6 @@ function syncTasksForCurrentSchedule(i, schedule, dayCleaning) {
   data[i].tasks = newTasks;
 }
 
-// === 7. Kalendarz ===
 function showCalendar(selectedIndex = null) {
   const cal = document.getElementById("calendar");
   cal.innerHTML = "";
@@ -1946,7 +2171,6 @@ function showCalendar(selectedIndex = null) {
   cal.appendChild(grid);
 }
 
-// === 8. Panel po prawej ===
 async function loadDayInfo(dateObj) {
   const box = document.getElementById("dayInfoContent");
   if (!box) return;
@@ -2054,7 +2278,6 @@ async function loadDayInfo(dateObj) {
   box.innerHTML = html;
 }
 
-// === 9. Otwieranie dnia ===
 function openDay(i) {
   try {
     currentOpenedIndex = i;
@@ -2169,7 +2392,6 @@ function openDay(i) {
   }
 }
 
-// === 10. Modal leków ===
 const medicineModal = document.getElementById("medicineModal");
 const medicineBtn = document.getElementById("medicineBtn");
 const closeMedicineModalBtn = document.getElementById("closeMedicineModalBtn");
@@ -2291,7 +2513,6 @@ savePlanBtn.onclick = () => {
   document.getElementById("planEvening").value = "";
 };
 
-// === 11. Cytaty ===
 const quoteModal = document.getElementById("quoteModal");
 const quoteManagerBtn = document.getElementById("quoteManagerBtn");
 const closeQuoteModalBtn = document.getElementById("closeQuoteModalBtn");
@@ -2365,7 +2586,6 @@ saveQuoteBtn.onclick = () => {
   input.value = "";
 };
 
-// === 12. Polski ===
 function openWsjpSearch() {
   const value = document.getElementById("wsjpInput").value.trim();
   if (!value) return;
@@ -2401,7 +2621,6 @@ document.getElementById("bablaInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") openBablaSearch();
 });
 
-// === 13. Prawdziwy eksport do DOCX ===
 async function exportDiaryToDocx() {
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = window.docx;
 
@@ -2476,12 +2695,12 @@ async function exportDiaryToDocx() {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, "TodayIsTheDay_Dziennik.docx");
+  window.saveAs(blob, "TodayIsTheDay_Dziennik.docx");
 }
 
 document.getElementById("exportBtn").onclick = async function() {
   try {
-    if (!window.docx || typeof saveAs !== "function") {
+    if (!window.docx || typeof window.saveAs !== "function") {
       alert("Biblioteki eksportu DOCX nie zostały załadowane.");
       return;
     }
@@ -2493,11 +2712,20 @@ document.getElementById("exportBtn").onclick = async function() {
   }
 };
 
-// === 14. Start ===
-saveMedicinePlans();
-updateProgress();
-showCalendar(todayIndex);
-openDay(todayIndex);
+async function startApp() {
+  ensureDayExists(todayIndex);
+  persistStateLocallyOnly();
+
+  await initSync();
+
+  ensureDayExists(todayIndex);
+  persistStateLocallyOnly();
+  updateProgress();
+  showCalendar(todayIndex);
+  openDay(todayIndex);
+}
+
+startApp();
 </script>
 </body>
 </html>
