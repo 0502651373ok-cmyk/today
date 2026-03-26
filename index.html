@@ -336,7 +336,11 @@ button.modal-close,
 button.delete-plan-btn,
 button.polish-btn,
 button.quote-btn,
-button.quote-delete-btn {
+button.quote-delete-btn,
+button.diary-btn,
+button.diary-save-btn,
+button.diary-cancel-btn,
+button.diary-edit-btn {
   background: #8bc34a;
   color: white;
   border: none;
@@ -371,6 +375,18 @@ button.polish-btn {
 
 button.back {
   margin-top: 15px;
+}
+
+button.diary-edit-btn {
+  background: #33691e;
+}
+
+button.diary-save-btn {
+  background: #2e7d32;
+}
+
+button.diary-cancel-btn {
+  background: #757575;
 }
 
 .action-buttons {
@@ -522,6 +538,38 @@ textarea {
   display: block;
   color: #666;
   margin-top: 4px;
+}
+
+.diary-box {
+  background: #fafcf6;
+  border: 1px solid #dfe8d0;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.diary-view {
+  min-height: 110px;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: #333;
+}
+
+.diary-empty {
+  color: #777;
+  font-style: italic;
+}
+
+.diary-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.diary-hint {
+  margin-top: 8px;
+  color: #5f6f52;
+  font-size: 0.92em;
 }
 
 #medicineModal,
@@ -939,6 +987,12 @@ let currentYear = today.getFullYear();
 let currentOpenedIndex = todayIndex;
 let currentDayInfoRequestId = 0;
 
+const diaryEditState = {
+  isEditing: false,
+  dayIndex: null,
+  draft: ""
+};
+
 function weatherArchiveKey(dateKey) {
   return `${WEATHER_ARCHIVE_PREFIX}${dateKey}`;
 }
@@ -1062,6 +1116,13 @@ function redrawAfterRemoteSync() {
     currentYear = openedDate.getFullYear();
 
     showCalendar(currentOpenedIndex);
+
+    if (diaryEditState.isEditing && diaryEditState.dayIndex === currentOpenedIndex) {
+      loadDayInfo(openedDate);
+      refreshDayButtonState(currentOpenedIndex);
+      return;
+    }
+
     openDay(currentOpenedIndex);
   } finally {
     isRemoteUpdatingUi = false;
@@ -2278,10 +2339,107 @@ async function loadDayInfo(dateObj) {
   box.innerHTML = html;
 }
 
+function enterDiaryEditMode(dayIndex) {
+  ensureDayExists(dayIndex);
+  diaryEditState.isEditing = true;
+  diaryEditState.dayIndex = dayIndex;
+  diaryEditState.draft = data[dayIndex].diary || "";
+  openDay(dayIndex);
+}
+
+function cancelDiaryEdit(dayIndex) {
+  if (diaryEditState.dayIndex !== dayIndex) return;
+  diaryEditState.isEditing = false;
+  diaryEditState.dayIndex = null;
+  diaryEditState.draft = "";
+  openDay(dayIndex);
+}
+
+async function submitDiaryEdit(dayIndex, value) {
+  ensureDayExists(dayIndex);
+  data[dayIndex].diary = value;
+  diaryEditState.isEditing = false;
+  diaryEditState.dayIndex = null;
+  diaryEditState.draft = "";
+  await saveAllState();
+  openDay(dayIndex);
+}
+
+function buildDiarySection(dayIndex) {
+  const section = document.createElement("section");
+  section.innerHTML = "<h3>DZIENNIK</h3>";
+
+  const box = document.createElement("div");
+  box.className = "diary-box";
+
+  const isEditing = diaryEditState.isEditing && diaryEditState.dayIndex === dayIndex;
+
+  if (isEditing) {
+    const ta = document.createElement("textarea");
+    ta.value = diaryEditState.draft;
+    ta.placeholder = "Zapisz, jak minął dzień...";
+    ta.addEventListener("input", () => {
+      diaryEditState.draft = ta.value;
+    });
+
+    const hint = document.createElement("div");
+    hint.className = "diary-hint";
+    hint.textContent = "Zmiany zapiszą się dopiero po kliknięciu „Wyślij”.";
+
+    const actions = document.createElement("div");
+    actions.className = "diary-actions";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "diary-save-btn";
+    saveBtn.textContent = "Wyślij";
+    saveBtn.onclick = async () => {
+      await submitDiaryEdit(dayIndex, ta.value);
+    };
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "diary-cancel-btn";
+    cancelBtn.textContent = "Anuluj";
+    cancelBtn.onclick = () => cancelDiaryEdit(dayIndex);
+
+    actions.append(saveBtn, cancelBtn);
+    box.append(ta, hint, actions);
+  } else {
+    const view = document.createElement("div");
+    view.className = "diary-view";
+
+    const diaryText = data[dayIndex].diary || "";
+    if (diaryText.trim()) {
+      view.textContent = diaryText;
+    } else {
+      view.innerHTML = `<span class="diary-empty">Brak wpisu w dzienniku.</span>`;
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "diary-actions";
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "diary-edit-btn";
+    editBtn.textContent = diaryText.trim() ? "Redaguj" : "Dodaj wpis";
+    editBtn.onclick = () => enterDiaryEditMode(dayIndex);
+
+    actions.appendChild(editBtn);
+    box.append(view, actions);
+  }
+
+  section.appendChild(box);
+  return section;
+}
+
 function openDay(i) {
   try {
     currentOpenedIndex = i;
     ensureDayExists(i);
+
+    if (!(diaryEditState.isEditing && diaryEditState.dayIndex === i)) {
+      diaryEditState.isEditing = false;
+      diaryEditState.dayIndex = null;
+      diaryEditState.draft = "";
+    }
 
     const c = document.getElementById("content");
     const d = new Date(startDate);
@@ -2359,17 +2517,7 @@ function openDay(i) {
     clSection.appendChild(clLabel);
     c.appendChild(clSection);
 
-    const diary = document.createElement("section");
-    diary.innerHTML = "<h3>DZIENNIK</h3>";
-    const ta = document.createElement("textarea");
-    ta.value = data[i].diary || "";
-    ta.placeholder = "Zapisz, jak minął dzień...";
-    ta.oninput = () => {
-      data[i].diary = ta.value;
-      saveData();
-    };
-    diary.appendChild(ta);
-    c.appendChild(diary);
+    c.appendChild(buildDiarySection(i));
 
     const back = document.createElement("button");
     back.className = "back";
@@ -2377,6 +2525,15 @@ function openDay(i) {
     back.onclick = () => {
       currentMonth = d.getMonth();
       currentYear = d.getFullYear();
+
+      if (diaryEditState.isEditing && diaryEditState.dayIndex === i) {
+        const shouldLeave = confirm("Masz niezapisany tekst. Opuścić bez zapisywania?");
+        if (!shouldLeave) return;
+        diaryEditState.isEditing = false;
+        diaryEditState.dayIndex = null;
+        diaryEditState.draft = "";
+      }
+
       showCalendar(i);
       document.getElementById("content").style.display = "none";
     };
