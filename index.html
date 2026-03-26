@@ -109,74 +109,214 @@ header {
   gap: 14px;
 }
 
-.hourly-weather-strip {
+.weather-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  background: linear-gradient(180deg, #fbfdf7 0%, #f5faee 100%);
+  border: 1px solid #e1ead6;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.weather-hero-main {
+  min-width: 0;
+}
+
+.weather-summary-title {
+  color: #33691e;
+  font-weight: bold;
+  font-size: 1em;
+  margin-bottom: 6px;
+  line-height: 1.25;
+}
+
+.weather-summary-subtitle {
+  color: #4f5f40;
+  font-size: 0.93em;
+  line-height: 1.35;
+}
+
+.weather-hero-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  text-align: right;
+  color: #33691e;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+.weather-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eef6e2;
+  border: 1px solid #dbe8c7;
+  color: #2f5d19;
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+.weather-visual-wrap {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 4px;
 }
 
-.hourly-weather-strip::-webkit-scrollbar {
+.weather-visual-wrap::-webkit-scrollbar {
   height: 8px;
 }
 
-.hourly-weather-strip::-webkit-scrollbar-thumb {
+.weather-visual-wrap::-webkit-scrollbar-thumb {
   background: #c5d6b2;
   border-radius: 10px;
 }
 
-.hourly-grid {
-  display: grid;
-  grid-template-columns: 82px repeat(12, minmax(58px, 1fr));
-  min-width: 780px;
+.weather-visual {
+  min-width: 930px;
   border: 1px solid #e3ebd9;
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
 }
 
-.hourly-label-cell,
-.hourly-hour-cell,
-.hourly-value-cell {
-  padding: 10px 8px;
+.weather-chart-head {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(68px, 1fr));
+  background: #f8fbf4;
+  border-bottom: 1px solid #edf2e8;
+}
+
+.weather-hour-col {
+  text-align: center;
+  padding: 10px 6px;
+  border-right: 1px solid #edf2e8;
+  box-sizing: border-box;
+}
+
+.weather-hour-col:last-child {
+  border-right: none;
+}
+
+.weather-hour-col.has-rain {
+  background: linear-gradient(180deg, #eef7ff 0%, #f8fcff 100%);
+}
+
+.weather-hour-time {
+  font-size: 0.86em;
+  color: #5c6f48;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.weather-hour-icon {
+  font-size: 1.28em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.weather-hour-desc {
+  font-size: 0.76em;
+  line-height: 1.2;
+  color: #4f5f40;
+  min-height: 30px;
+}
+
+.weather-svg-box {
+  position: relative;
+  border-bottom: 1px solid #edf2e8;
+  background:
+    linear-gradient(180deg, rgba(247,251,240,0.9) 0%, rgba(255,255,255,1) 100%);
+}
+
+.weather-svg {
+  display: block;
+  width: 100%;
+  height: 180px;
+}
+
+.weather-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf2e8;
+  font-size: 0.88em;
+  color: #486235;
+  background: #fcfef9;
+}
+
+.weather-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.weather-legend-line {
+  width: 26px;
+  height: 0;
+  border-top: 3px solid #558b2f;
+}
+
+.weather-legend-line.dashed {
+  border-top-style: dashed;
+  border-top-color: #8bc34a;
+}
+
+.weather-table {
+  display: grid;
+  grid-template-columns: 90px repeat(12, minmax(68px, 1fr));
+  background: #fff;
+}
+
+.weather-row-label,
+.weather-cell {
+  padding: 10px 6px;
   text-align: center;
   border-right: 1px solid #edf2e8;
   border-bottom: 1px solid #edf2e8;
   box-sizing: border-box;
 }
 
-.hourly-grid > *:nth-last-child(-n + 13) {
+.weather-table > *:nth-last-child(-n + 13) {
   border-bottom: none;
 }
 
-.hourly-grid > *:nth-child(13n) {
+.weather-table > *:nth-child(13n) {
   border-right: none;
 }
 
-.hourly-label-cell {
-  background: #f3f8eb;
-  font-weight: bold;
-  color: #33691e;
+.weather-row-label {
   position: sticky;
   left: 0;
   z-index: 1;
-}
-
-.hourly-hour-cell {
-  background: #f9fcf5;
-  font-size: 0.9em;
-  color: #5c6f48;
+  background: #f3f8eb;
+  color: #33691e;
   font-weight: bold;
 }
 
-.hourly-value-cell {
+.weather-cell {
   color: #2f5d19;
   font-weight: bold;
   background: #fff;
 }
 
-.hourly-value-cell.diff-highlight {
-  background: #fff2cc;
-  color: #7a5600;
+.weather-cell.has-rain {
+  background: #f4faff;
+}
+
+.weather-cell.rain-strong {
+  background: #e3f2fd;
+  color: #0d47a1;
+}
+
+.weather-cell.muted {
+  color: #6e7b62;
+  font-weight: normal;
 }
 
 .weather-explain-box {
@@ -751,6 +891,15 @@ textarea {
   .top-meta-card {
     min-height: auto;
   }
+
+  .weather-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .weather-hero-side {
+    align-items: flex-start;
+    text-align: left;
+  }
 }
 
 @media (max-width: 900px) {
@@ -760,16 +909,8 @@ textarea {
 }
 
 @media (max-width: 700px) {
-  .hourly-grid {
-    grid-template-columns: 74px repeat(12, minmax(52px, 1fr));
-    min-width: 700px;
-  }
-
-  .hourly-label-cell,
-  .hourly-hour-cell,
-  .hourly-value-cell {
-    padding: 9px 6px;
-    font-size: 0.92em;
+  .weather-visual {
+    min-width: 860px;
   }
 }
 
@@ -1650,6 +1791,26 @@ function getWeatherCodeDescription(code) {
   return map[code] || "Brak opisu";
 }
 
+function getWeatherIcon(code) {
+  if ([0].includes(code)) return "☀️";
+  if ([1, 2].includes(code)) return "🌤️";
+  if ([3].includes(code)) return "☁️";
+  if ([45, 48].includes(code)) return "🌫️";
+  if ([51, 53, 55, 56, 57].includes(code)) return "🌦️";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "🌧️";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "❄️";
+  if ([95, 96, 99].includes(code)) return "⛈️";
+  return "🌥️";
+}
+
+function formatWindDirection(deg) {
+  const value = Number(deg);
+  if (Number.isNaN(value)) return "—";
+  const directions = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"];
+  const index = Math.round(value / 45) % 8;
+  return directions[index];
+}
+
 function getForecastHorizonDays() {
   return 16;
 }
@@ -1676,11 +1837,24 @@ function buildHourlyPoints(hourly) {
     const hour = dt.getHours();
     if (hour % 2 !== 0) continue;
 
+    const rain = Number(hourly.rain?.[i] ?? 0);
+    const showers = Number(hourly.showers?.[i] ?? 0);
+    const snowfall = Number(hourly.snowfall?.[i] ?? 0);
+    const precipitation = Number(hourly.precipitation?.[i] ?? (rain + showers + snowfall));
+
     points.push({
       time: iso,
       hourLabel: String(hour).padStart(2, "0") + ":00",
       temperature: hourly.temperature_2m?.[i] ?? null,
-      apparentTemperature: hourly.apparent_temperature?.[i] ?? null
+      apparentTemperature: hourly.apparent_temperature?.[i] ?? null,
+      weatherCode: hourly.weather_code?.[i] ?? null,
+      description: getWeatherCodeDescription(hourly.weather_code?.[i]),
+      precipitation: Number.isNaN(precipitation) ? 0 : precipitation,
+      rain: Number.isNaN(rain) ? 0 : rain,
+      showers: Number.isNaN(showers) ? 0 : showers,
+      snowfall: Number.isNaN(snowfall) ? 0 : snowfall,
+      windSpeed: hourly.wind_speed_10m?.[i] ?? null,
+      windDirection: hourly.wind_direction_10m?.[i] ?? null
     });
   }
 
@@ -1709,7 +1883,7 @@ async function fetchForecastWeatherForDate(dateObj) {
   const coords = await getPrudnikCoords();
   const dateKey = formatYMD(dateObj);
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,pressure_msl,weather_code&timezone=Europe%2FWarsaw`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(coords.latitude)}&longitude=${encodeURIComponent(coords.longitude)}&start_date=${dateKey}&end_date=${dateKey}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,pressure_msl,weather_code,precipitation,rain,showers,snowfall,wind_speed_10m,wind_direction_10m&timezone=Europe%2FWarsaw`;
 
   const json = await fetchJsonWithTimeout(url, 9000);
   const hourly = json?.hourly || {};
@@ -1754,7 +1928,15 @@ async function fetchSeasonalWeatherForDate(dateObj) {
       time: `${dateKey}T${String(hour).padStart(2, "0")}:00`,
       hourLabel: String(hour).padStart(2, "0") + ":00",
       temperature: meanTemp,
-      apparentTemperature: meanAppTemp
+      apparentTemperature: meanAppTemp,
+      weatherCode,
+      description: weatherCode !== null ? getWeatherCodeDescription(weatherCode) : "Prognoza modelowa",
+      precipitation: 0,
+      rain: 0,
+      showers: 0,
+      snowfall: 0,
+      windSpeed: null,
+      windDirection: null
     });
   }
 
@@ -1776,7 +1958,23 @@ function normalizeStoredWeatherRecord(stored, dateKey) {
   if (!stored) return null;
 
   if (Array.isArray(stored.hourly) && stored.hourly.length) {
-    return stored;
+    return {
+      ...stored,
+      hourly: stored.hourly.map((point, idx) => ({
+        time: point.time || `${dateKey}T${String((idx * 2) % 24).padStart(2, "0")}:00`,
+        hourLabel: point.hourLabel || `${String((idx * 2) % 24).padStart(2, "0")}:00`,
+        temperature: point.temperature ?? null,
+        apparentTemperature: point.apparentTemperature ?? null,
+        weatherCode: point.weatherCode ?? stored.weatherCode ?? null,
+        description: point.description || getWeatherCodeDescription(point.weatherCode ?? stored.weatherCode ?? null),
+        precipitation: Number(point.precipitation ?? point.rain ?? 0) || 0,
+        rain: Number(point.rain ?? point.precipitation ?? 0) || 0,
+        showers: Number(point.showers ?? 0) || 0,
+        snowfall: Number(point.snowfall ?? 0) || 0,
+        windSpeed: point.windSpeed ?? null,
+        windDirection: point.windDirection ?? null
+      }))
+    };
   }
 
   if (stored.temperature !== undefined || stored.apparentTemperature !== undefined) {
@@ -1786,7 +1984,15 @@ function normalizeStoredWeatherRecord(stored, dateKey) {
         time: `${dateKey}T${String(hour).padStart(2, "0")}:00`,
         hourLabel: String(hour).padStart(2, "0") + ":00",
         temperature: stored.temperature ?? null,
-        apparentTemperature: stored.apparentTemperature ?? null
+        apparentTemperature: stored.apparentTemperature ?? null,
+        weatherCode: stored.weatherCode ?? null,
+        description: getWeatherCodeDescription(stored.weatherCode ?? null),
+        precipitation: Number(stored.precipitation ?? stored.rain ?? 0) || 0,
+        rain: Number(stored.rain ?? stored.precipitation ?? 0) || 0,
+        showers: 0,
+        snowfall: Number(stored.snowfall ?? 0) || 0,
+        windSpeed: stored.windSpeed ?? null,
+        windDirection: stored.windDirection ?? null
       });
     }
 
@@ -1944,34 +2150,206 @@ async function resolveWeatherForDate(dateObj) {
   };
 }
 
-function buildHourlyGridHtml(hourlyPoints) {
+function getPrecipitationSummary(hourlyPoints) {
+  const rainy = hourlyPoints.filter(point => Number(point.precipitation) > 0.05);
+
+  if (!rainy.length) {
+    return "Najbliższe godziny bez opadów";
+  }
+
+  const first = rainy[0];
+  const last = rainy[rainy.length - 1];
+  const maxPrecip = Math.max(...rainy.map(point => Number(point.precipitation) || 0));
+  const type = rainy.some(point => Number(point.snowfall) > 0.05)
+    ? "Śnieg"
+    : "Deszcz";
+
+  if (first.hourLabel === last.hourLabel) {
+    return `${type}: około ${first.hourLabel} • do ${maxPrecip.toFixed(1)} mm`;
+  }
+
+  return `${type}: ${first.hourLabel}–${last.hourLabel} • do ${maxPrecip.toFixed(1)} mm`;
+}
+
+function getMainWeatherSummary(weatherData) {
+  if (!weatherData?.hourly?.length) return "Brak danych pogodowych";
+
+  const rainy = weatherData.hourly.filter(point => Number(point.precipitation) > 0.05);
+  if (rainy.length) return getPrecipitationSummary(weatherData.hourly);
+
+  const firstCode = weatherData.hourly[0]?.weatherCode;
+  return getWeatherCodeDescription(firstCode);
+}
+
+function buildWeatherChartSvg(hourlyPoints) {
+  const points = hourlyPoints.slice(0, 12);
+  if (!points.length) {
+    return "";
+  }
+
+  const width = points.length * 74;
+  const height = 180;
+  const topPad = 20;
+  const bottomPad = 34;
+  const plotHeight = height - topPad - bottomPad;
+  const xStep = 74;
+
+  const values = [];
+  points.forEach(point => {
+    if (typeof point.temperature === "number") values.push(point.temperature);
+    if (typeof point.apparentTemperature === "number") values.push(point.apparentTemperature);
+  });
+
+  const minValue = values.length ? Math.floor(Math.min(...values) - 2) : 0;
+  const maxValue = values.length ? Math.ceil(Math.max(...values) + 2) : 10;
+  const range = Math.max(1, maxValue - minValue);
+
+  const yFor = (value) => {
+    if (typeof value !== "number" || Number.isNaN(value)) return topPad + plotHeight / 2;
+    const ratio = (value - minValue) / range;
+    return topPad + plotHeight - (ratio * plotHeight);
+  };
+
+  const buildPolylinePoints = (field) => {
+    return points.map((point, index) => {
+      const x = (index * xStep) + (xStep / 2);
+      const y = yFor(point[field]);
+      return `${x},${y}`;
+    }).join(" ");
+  };
+
+  const tempPolyline = buildPolylinePoints("temperature");
+  const feelsPolyline = buildPolylinePoints("apparentTemperature");
+
+  const gridLines = [];
+  for (let i = 0; i <= 4; i++) {
+    const y = topPad + (plotHeight * i / 4);
+    gridLines.push(`<line x1="0" y1="${y}" x2="${width}" y2="${y}" stroke="#edf2e8" stroke-width="1"/>`);
+  }
+
+  const rainBars = points.map((point, index) => {
+    const precip = Number(point.precipitation) || 0;
+    if (precip <= 0.05) return "";
+    const maxBar = 34;
+    const normalized = Math.min(1, precip / 3);
+    const barHeight = Math.max(6, maxBar * normalized);
+    const x = (index * xStep) + (xStep / 2) - 10;
+    const y = height - 12 - barHeight;
+    return `<rect x="${x}" y="${y}" width="20" height="${barHeight}" rx="4" fill="#90caf9" opacity="0.75"/>`;
+  }).join("");
+
+  const tempDots = points.map((point, index) => {
+    const x = (index * xStep) + (xStep / 2);
+    const y = yFor(point.temperature);
+    return `<circle cx="${x}" cy="${y}" r="3.5" fill="#558b2f"/>`;
+  }).join("");
+
+  const feelsDots = points.map((point, index) => {
+    const x = (index * xStep) + (xStep / 2);
+    const y = yFor(point.apparentTemperature);
+    return `<circle cx="${x}" cy="${y}" r="2.7" fill="#8bc34a"/>`;
+  }).join("");
+
+  const valueLabels = points.map((point, index) => {
+    const x = (index * xStep) + (xStep / 2);
+    const y = yFor(point.temperature) - 10;
+    const value = typeof point.temperature === "number" ? `${Math.round(point.temperature)}°` : "—";
+    return `<text x="${x}" y="${y}" text-anchor="middle" font-size="11" fill="#33691e" font-weight="bold">${value}</text>`;
+  }).join("");
+
+  return `
+    <div class="weather-svg-box">
+      <svg class="weather-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="Wykres temperatury">
+        ${gridLines.join("")}
+        ${rainBars}
+        <polyline points="${feelsPolyline}" fill="none" stroke="#8bc34a" stroke-width="2.5" stroke-dasharray="6 6" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${tempPolyline}" fill="none" stroke="#558b2f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        ${tempDots}
+        ${feelsDots}
+        ${valueLabels}
+      </svg>
+    </div>
+  `;
+}
+
+function buildHourlyVisualHtml(hourlyPoints) {
   if (!Array.isArray(hourlyPoints) || !hourlyPoints.length) {
     return `<div class="top-weather-muted">Brak godzinowych danych pogodowych.</div>`;
   }
 
-  const hours = hourlyPoints.map(p => `<div class="hourly-hour-cell">${escapeHtml(p.hourLabel)}</div>`).join("");
+  const points = hourlyPoints.slice(0, 12);
 
-  const tempRow = hourlyPoints.map(p => {
-    const diff = Math.abs((Number(p.temperature) || 0) - (Number(p.apparentTemperature) || 0));
-    const highlight = diff > 3 ? " diff-highlight" : "";
-    return `<div class="hourly-value-cell${highlight}">${escapeHtml(formatNumberValue(p.temperature, "°C", 1))}</div>`;
+  const headHtml = points.map(point => {
+    const hasRain = Number(point.precipitation) > 0.05;
+    return `
+      <div class="weather-hour-col${hasRain ? " has-rain" : ""}">
+        <div class="weather-hour-time">${escapeHtml(point.hourLabel)}</div>
+        <div class="weather-hour-icon">${escapeHtml(getWeatherIcon(point.weatherCode))}</div>
+        <div class="weather-hour-desc">${escapeHtml(point.description)}</div>
+      </div>
+    `;
   }).join("");
 
-  const feelsRow = hourlyPoints.map(p => {
-    const diff = Math.abs((Number(p.temperature) || 0) - (Number(p.apparentTemperature) || 0));
-    const highlight = diff > 3 ? " diff-highlight" : "";
-    return `<div class="hourly-value-cell${highlight}">${escapeHtml(formatNumberValue(p.apparentTemperature, "°C", 1))}</div>`;
+  const tempRow = points.map(point => {
+    const hasRain = Number(point.precipitation) > 0.05;
+    return `
+      <div class="weather-cell${hasRain ? " has-rain" : ""}">
+        ${escapeHtml(formatNumberValue(point.temperature, "°C", 1))}
+      </div>
+    `;
   }).join("");
+
+  const feelsRow = points.map(point => {
+    const hasRain = Number(point.precipitation) > 0.05;
+    return `
+      <div class="weather-cell${hasRain ? " has-rain" : ""}">
+        ${escapeHtml(formatNumberValue(point.apparentTemperature, "°C", 1))}
+      </div>
+    `;
+  }).join("");
+
+  const precipRow = points.map(point => {
+    const precip = Number(point.precipitation) || 0;
+    const strong = precip >= 0.5;
+    return `
+      <div class="weather-cell${precip > 0.05 ? ` has-rain${strong ? " rain-strong" : ""}` : " muted"}">
+        ${precip > 0.05 ? escapeHtml(`${precip.toFixed(1)} mm`) : "—"}
+      </div>
+    `;
+  }).join("");
+
+  const windRow = points.map(point => {
+    const dir = formatWindDirection(point.windDirection);
+    const speed = typeof point.windSpeed === "number" ? `${Math.round(point.windSpeed)} km/h` : "—";
+    return `
+      <div class="weather-cell muted">
+        ${escapeHtml(dir)} ${escapeHtml(speed)}
+      </div>
+    `;
+  }).join("");
+
+  const chartSvg = buildWeatherChartSvg(points);
 
   return `
-    <div class="hourly-weather-strip">
-      <div class="hourly-grid">
-        <div class="hourly-label-cell">Godz.</div>
-        ${hours}
-        <div class="hourly-label-cell">Temp.</div>
-        ${tempRow}
-        <div class="hourly-label-cell">Odcz.</div>
-        ${feelsRow}
+    <div class="weather-visual-wrap">
+      <div class="weather-visual">
+        <div class="weather-chart-head">${headHtml}</div>
+        ${chartSvg}
+        <div class="weather-legend">
+          <span class="weather-legend-item"><span class="weather-legend-line"></span> Temperatura</span>
+          <span class="weather-legend-item"><span class="weather-legend-line dashed"></span> Odczuwalna</span>
+          <span class="weather-legend-item">Niebieskie słupki: opady</span>
+        </div>
+        <div class="weather-table">
+          <div class="weather-row-label">Temp.</div>
+          ${tempRow}
+          <div class="weather-row-label">Odcz.</div>
+          ${feelsRow}
+          <div class="weather-row-label">Opady</div>
+          ${precipRow}
+          <div class="weather-row-label">Wiatr</div>
+          ${windRow}
+        </div>
       </div>
     </div>
   `;
@@ -2046,11 +2424,29 @@ function buildTopWeatherHtml(weatherState) {
   }
 
   const w = weatherState.data;
-  const hourlyHtml = buildHourlyGridHtml(w.hourly);
+  const hourlyHtml = buildHourlyVisualHtml(w.hourly);
   const explainHtml = buildWeatherExplainHtml(w);
+  const summary = getMainWeatherSummary(w);
+  const sourceLabel = w.sourceType === "seasonal"
+    ? "Prognoza modelowa"
+    : w.sourceType === "forecast"
+      ? "Prognoza godzinowa"
+      : "Zapisana pogoda";
 
   return `
     <div class="weather-health-wrap">
+      <div class="weather-hero">
+        <div class="weather-hero-main">
+          <div class="weather-summary-title">${escapeHtml(summary)}</div>
+          <div class="weather-summary-subtitle">
+            ${escapeHtml(w.description || "Pogoda w Prudniku")}
+          </div>
+        </div>
+        <div class="weather-hero-side">
+          <div class="weather-pill">${escapeHtml(sourceLabel)}</div>
+          <div>${escapeHtml(w.city || "Prudnik")}</div>
+        </div>
+      </div>
       ${hourlyHtml}
       ${explainHtml}
     </div>
@@ -2080,22 +2476,44 @@ function getCosmeticsForWeekday(weekday) {
   return cosmetics[weekday];
 }
 
+function getWorkoutForDay(dayIndex, weekday) {
+  const workouts = [
+    "Spacer szybki 45 min + szyja 20 min",
+    "Fitness 40 min + rozciąganie 15 min",
+    "Marsz z kijkami 45 min + mobilność 15 min",
+    "Domowy trening całego ciała 35 min + szyja 20 min",
+    "Spacer 60 min + oddech 10 min",
+    "Lżejszy dzień: mobilność 25 min + rozciąganie 20 min",
+    "Regeneracja aktywna: spacer 30 min + oddech 10 min"
+  ];
+
+  const strengthBlocks = [
+    "Podciąganie / zwis / aktywacja łopatek 10–15 min",
+    "Ćwiczenia na szyję 20 min + Łapko 20 min"
+  ];
+
+  const workout = workouts[weekday];
+  const extra = dayIndex % 2 === 0 ? strengthBlocks[0] : strengthBlocks[1];
+
+  return [workout, extra];
+}
+
 function buildScheduleForDate(dayIndex, weekday, dateObj) {
   const plan = getMedicinePlanForDate(dateObj);
   const dcos = getCosmeticsForWeekday(weekday);
   const cleaningSchedule = ["Brak","Kuchnia","Salon","Łazienka","Balkon / korytarz","Generalne sprzątanie","Brak"];
   const dayCleaning = cleaningSchedule[weekday];
-  const workout = dayIndex % 2 === 0 ? "Fitness 40 min" : "Marsz z kijkami 45 min";
+  const workoutItems = getWorkoutForDay(dayIndex, weekday);
 
   const schedule = {
     RANO: [
       "☕ Kawa",
       ...(plan?.morning || []),
-      "Ćwiczenia na szyję 20 min + Łapko 20 min",
+      workoutItems[1],
       ...dcos.morning
     ],
     DZIEŃ: [
-      workout,
+      workoutItems[0],
       ...(plan?.day || []),
       ...dcos.day
     ],
